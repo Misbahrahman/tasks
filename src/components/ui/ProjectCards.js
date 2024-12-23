@@ -1,26 +1,53 @@
-// components/ProjectCard.jsx
+// src/components/ProjectCard.jsx
 import React, { useState } from 'react';
 import { Calendar, CheckCircle, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 import MoreButton from './MoreButton';
 import { SelectedAssignees } from './AssignEmployee';
+import { authService } from '../../firebase/auth';
+import { userService } from '../../firebase/userService';
 
 const ProjectCard = ({ 
   project, 
   onEdit, 
   onDelete,
-  onClose,
-  onClick 
+  onClose
 }) => {
+  const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
   const { 
     id,
     title, 
     description, 
-    progress, 
-    team,
-    daysLeft,
-    metricsDescription,
-    category
+    progress = 0, 
+    team = [],
+    metrics,
+    category,
+    createdAt
   } = project;
+
+  const handleProjectClick = async () => {
+    try {
+      if (isProcessing) return;
+      setIsProcessing(true);
+
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) return;
+
+      // Update user's current project
+      await userService.setCurrentProject(currentUser.uid, id);
+      
+      // Navigate to tasks view
+      navigate('/tasks');
+    } catch (error) {
+      console.error('Failed to select project:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const getProgressColor = (progress) => {
     if (progress >= 75) return 'bg-green-500';
@@ -28,8 +55,6 @@ const ProjectCard = ({
     if (progress >= 25) return 'bg-yellow-500';
     return 'bg-red-500';
   };
-
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const getCategoryColor = (category) => {
     const colors = {
@@ -41,14 +66,29 @@ const ProjectCard = ({
     return colors[category] || 'bg-slate-50 text-slate-600';
   };
 
+  // Calculate metrics description
+  const metricsDescription = metrics 
+    ? `${metrics.completedTasks}/${metrics.totalTasks} tasks`
+    : "0/0 tasks";
+
+  // Calculate days left
+  const getDaysLeft = () => {
+    if (!project.dueDate) return "No deadline";
+    const due = new Date(project.dueDate);
+    const today = new Date();
+    const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? `${diff} days left` : "Overdue";
+  };
+
   return (
     <div 
-      onClick={onClick}
-      className="w-[380px] bg-white rounded-[32px] p-6 
+      onClick={handleProjectClick}
+      className={`w-[380px] bg-white rounded-[32px] p-6 
         hover:shadow-lg transition-all duration-300 ease-in-out 
-        hover:translate-y-[-2px] cursor-pointer group"
+        hover:translate-y-[-2px] cursor-pointer group
+        ${isProcessing ? 'opacity-75 pointer-events-none' : ''}`}
     >
-      {/* Header */}
+      {/* Rest of your ProjectCard JSX */}
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 mb-1 
@@ -65,7 +105,10 @@ const ProjectCard = ({
             <>
               <div
                 className="fixed inset-0"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMenuOpen(false);
+                }}
               />
               <div className="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                 <div className="py-1">
@@ -76,6 +119,7 @@ const ProjectCard = ({
                       setIsMenuOpen(false);
                     }}
                     className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    disabled={isProcessing}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete Project
@@ -87,6 +131,7 @@ const ProjectCard = ({
                       setIsMenuOpen(false);
                     }}
                     className="flex w-full items-center px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                    disabled={isProcessing}
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Close Project
@@ -98,12 +143,10 @@ const ProjectCard = ({
         </div>
       </div>
 
-      {/* Description */}
       <p className="text-sm text-slate-500 mb-6 line-clamp-2">
         {description}
       </p>
 
-      {/* Progress Section */}
       <div className="space-y-4">
         <div className="space-y-2">
           <div className="flex justify-between items-center">
@@ -120,12 +163,11 @@ const ProjectCard = ({
         </div>
       </div>
 
-      {/* Footer */}
       <div className="mt-6 flex items-center justify-between">
         {team && <SelectedAssignees assignees={team} />}
         <div className="flex items-center">
           <Calendar className="w-3 h-3 text-pink-500 mr-1" />
-          <span className="text-xs text-pink-600">{daysLeft} left</span>
+          <span className="text-xs text-pink-600">{getDaysLeft()}</span>
         </div>
       </div>
     </div>
