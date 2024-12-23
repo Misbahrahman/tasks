@@ -1,94 +1,11 @@
 import React, { useState } from "react";
-import { MoreVertical, Plus, X, Calendar } from "lucide-react";
+import {Plus} from "lucide-react";
 import Sidebar from "./Sidebar";
 import { Avatar } from "./ui/Avatar";
 import TaskModal from "./modals/TaskModal";
-import MoreButton from "./ui/MoreButton";
 import Header from "./ui/Header";
 import TaskCard from "./ui/TaskCard";
-
-// Sample task data with priorities
-const sampleTasks = {
-  todo: [
-    {
-      title: "Homepage Design",
-      description: "Create main landing page layout and components",
-      assignees: ["JD", "SK"],
-      priority: "high",
-      dueDate: "2024-12-20",
-    },
-    {
-      title: "Feature Implementation",
-      description: "Implement core features for the dashboard",
-      assignees: ["JD", "AM"],
-      priority: "medium",
-      dueDate: "2024-12-25",
-    },
-    {
-      title: "Design System",
-      description: "Create a consistent design system",
-      assignees: ["SK"],
-      priority: "low",
-      dueDate: "2024-12-28",
-    },
-  ],
-  inProgress: [
-    {
-      title: "Navigation Menu",
-      description: "Implement responsive navigation components",
-      assignees: ["AM"],
-      priority: "medium",
-      dueDate: "2024-12-18",
-    },
-    {
-      title: "API Integration",
-      description: "Connect frontend with backend services",
-      assignees: ["JD", "SK"],
-      priority: "high",
-      dueDate: "2024-12-15",
-    },
-  ],
-  done: [
-    {
-      title: "User Research",
-      description: "Analyze user feedback and requirements",
-      assignees: ["SK", "JD"],
-      priority: "medium",
-      dueDate: "2024-12-10",
-    },
-    {
-      title: "Wireframing",
-      description: "Create initial wireframes for approval",
-      assignees: ["AM"],
-      priority: "low",
-      dueDate: "2024-12-05",
-    },
-  ],
-};
-
-// // Task Column Component
-// const TaskColumn = ({ title, tasks, count }) => {
-//   return (
-//     <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm">
-//       <div className="px-6 py-4 border-b border-slate-100">
-//         <div className="flex items-center justify-between">
-//           <h2 className="font-medium text-slate-800">{title}</h2>
-//           <span className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 px-2.5 py-1 rounded-lg text-sm font-medium">
-//             {count}
-//           </span>
-//         </div>
-//       </div>
-//       <div className="p-6">
-//         <div className="space-y-4">
-//           {tasks.map((task, index) => (
-//             <TaskCard key={index} {...task} />
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
+import TaskDetailModal from "./ui/TaskDetailModal";
 
 // Update the AvatarGroup component to use the color palette
 const AvatarGroup = ({ users }) => {
@@ -106,8 +23,6 @@ const AvatarGroup = ({ users }) => {
   );
 };
 
-
-
 // TaskColumn component with drop functionality
 const TaskColumn = ({
   title,
@@ -116,6 +31,8 @@ const TaskColumn = ({
   count,
   onDrop,
   onDeleteTask,
+  setSelectedTask,
+  setIsTaskDetailModalOpen,
 }) => {
   const [isOver, setIsOver] = useState(false);
 
@@ -169,6 +86,8 @@ const TaskColumn = ({
               {...task}
               columnId={columnId}
               onDelete={onDeleteTask}
+              setSelectedTask={setSelectedTask}
+              setIsTaskDetailModalOpen={setIsTaskDetailModalOpen}
             />
           ))}
         </div>
@@ -180,6 +99,9 @@ const TaskColumn = ({
 // Main Kanban component
 const Kanban = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
+  
+  const [selectedtask, setSelectedTask] = useState(null);
 
   // Initialize tasks with IDs
   const initialTasks = {
@@ -301,6 +223,8 @@ const Kanban = () => {
               count={tasks.todo.length}
               onDrop={handleDrop}
               onDeleteTask={handleDeleteTask}
+              setSelectedTask={setSelectedTask}
+              setIsTaskDetailModalOpen={setIsTaskDetailModalOpen}
             />
             <TaskColumn
               title="In Progress"
@@ -308,13 +232,17 @@ const Kanban = () => {
               columnId="inProgress"
               count={tasks.inProgress.length}
               onDrop={handleDrop}
+              setSelectedTask={setSelectedTask}
+              setIsTaskDetailModalOpen={setIsTaskDetailModalOpen}
             />
             <TaskColumn
               title="Done"
               tasks={tasks.done}
-              columnId="done"
+              columnId="done" 
               count={tasks.done.length}
               onDrop={handleDrop}
+              setSelectedTask={setSelectedTask}
+              setIsTaskDetailModalOpen={setIsTaskDetailModalOpen}
             />
           </div>
         </main>
@@ -325,9 +253,14 @@ const Kanban = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleAddTask}
       />
+
+      <TaskDetailModal
+        isOpen={isTaskDetailModalOpen}
+        onClose={() => setIsTaskDetailModalOpen(false)}
+        task={selectedtask}
+      />
     </div>
   );
 };
-
 
 export default Kanban;

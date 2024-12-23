@@ -4,44 +4,14 @@ import Sidebar from './Sidebar';
 import Header from './ui/Header';
 import ProjectCard from './ui/ProjectCards';
 import TaskCard from './ui/TaskCard';
+import { AVATAR_COLOR_MAP } from '../utils';
 
-const AVATAR_COLOR_OPTIONS = [
-    
-        {
-          id: 'teal',
-          label: "Serene Teal",
-          bgClass: "bg-gradient-to-br from-teal-500 to-teal-600"
-        },
-        {
-          id: 'cyan',
-          label: "Icy Cyan",
-          bgClass: "bg-gradient-to-br from-cyan-500 to-cyan-600"
-        },
-        {
-          id: 'indigo',
-          label: "Midnight Indigo",
-          bgClass: "bg-gradient-to-br from-indigo-500 to-indigo-600"
-        },
-        {
-          id: 'fuchsia',
-          label: "Mystic Fuchsia",
-          bgClass: "bg-gradient-to-br from-fuchsia-500 to-fuchsia-600"
-        },
-        {
-          id: 'lime',
-          label: "Lively Lime",
-          bgClass: "bg-gradient-to-br from-lime-500 to-lime-600"
-        },
-        {
-          id: 'yellow',
-          label: "Radiant Yellow",
-          bgClass: "bg-gradient-to-br from-yellow-500 to-yellow-600"
-        }
-      ];
-      
 
 const ProfilePage = () => {
-  const [selectedColor, setSelectedColor] = useState(AVATAR_COLOR_OPTIONS[0]);
+  const [selectedColorId, setSelectedColorId] = useState("teal");
+
+const selectedColor = AVATAR_COLOR_MAP[selectedColorId];
+
   
   // Rest of your existing user data...
   const userData = {
@@ -159,22 +129,23 @@ const ProfilePage = () => {
               <h2 className="text-lg font-semibold text-slate-800">Avatar Color</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {AVATAR_COLOR_OPTIONS.map((color) => (
-                <button
-                  key={color.id}
-                  onClick={() => setSelectedColor(color)}
-                  className={`relative p-4 rounded-xl transition-all duration-200 
-                    ${selectedColor.id === color.id 
-                      ? 'ring-2 ring-blue-500 ring-offset-2' 
-                      : 'hover:bg-slate-50'}`}
-                >
-                  <div className="flex flex-col items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full ${color.bgClass} shadow-sm`} />
-                    <span className="text-sm text-slate-600">{color.label}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+  {Object.values(AVATAR_COLOR_MAP).map((color) => (
+    <button
+      key={color.id}
+      onClick={() => setSelectedColorId(color.id)}
+      className={`relative p-4 rounded-xl transition-all duration-200 
+        ${selectedColorId === color.id 
+          ? 'ring-2 ring-blue-500 ring-offset-2' 
+          : 'hover:bg-slate-50'}`}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className={`w-12 h-12 rounded-full ${color.bgClass} shadow-sm`} />
+        <span className="text-sm text-slate-600">{color.label}</span>
+      </div>
+    </button>
+  ))}
+</div>
+
           </div>
 
           {/* Metrics Grid */}
