@@ -1,19 +1,51 @@
-import React, { useState } from 'react';
+// src/components/Sidebar.jsx
+import React, { useState, useEffect } from 'react';
 import { User, List, Users, LogOut, Briefcase, LayoutGrid } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { authService } from '../firebase/auth';
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [userInitials, setUserInitials] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
   const [selectedNav, setSelectedNav] = useState(() => {
     const path = location.pathname;
     if (path === '/') return 'projects';
     return path.substring(1);
   });
 
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (user?.displayName) {
+      const initials = user.displayName
+        .split(' ')
+        .map(name => name[0])
+        .join('')
+        .toUpperCase();
+      setUserInitials(initials);
+    }
+  }, []);
+
   const handleNavClick = (navId, path) => {
     setSelectedNav(navId);
     navigate(path);
+  };
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevent multiple clicks
+
+    try {
+      setIsLoggingOut(true);
+      await authService.logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // You could add a toast notification here for error feedback
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -98,9 +130,15 @@ const Sidebar = () => {
             My Profile
           </button>
           
-          <button className="w-full flex items-center px-4 py-3.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
-            <LogOut className="w-5 h-5 mr-3 text-slate-400" />
-            Logout
+          <button 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className={`w-full flex items-center px-4 py-3.5 rounded-xl text-sm font-medium 
+              text-slate-600 hover:bg-slate-50 transition-all
+              ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <LogOut className={`w-5 h-5 mr-3 ${isLoggingOut ? 'text-slate-300' : 'text-slate-400'}`} />
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
           </button>
         </div>
       </nav>

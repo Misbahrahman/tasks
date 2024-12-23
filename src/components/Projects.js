@@ -1,134 +1,76 @@
-// pages/ProjectsPage.jsx
+// src/pages/ProjectsPage.jsx
 import React, { useState } from "react";
-import { Plus, Search,} from "lucide-react";
+import { Plus, Search, Loader } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "./ui/Header";
 import ProjectModal from "./modals/ProjectModal";
 import ProjectCard from "./ui/ProjectCards";
 import ConfirmationModal from "./modals/ConfirmationModal";
-
+import { useProjects } from "../hooks/useProjects";
+import { projectsService } from "../firebase/projectsService";
+import { authService } from "../firebase/auth";
 
 const ProjectsPage = () => {
-  let dummyProjects = [
-    {
-      id: 1,
-      title: "Website Redesign",
-      description:
-        "Complete overhaul of the company's main website with modern design principles and improved user experience",
-      progress: 75,
-      metricsDescription: "15/20 tasks",
-      daysLeft: "7 days",
-      category: "design",
-      team: ["JD", "AM", "SK"],
-    },
-    {
-      id: 2,
-      title: "Mobile App Development",
-      description:
-        "Building a cross-platform mobile application for customer engagement and service delivery",
-      progress: 45,
-      metricsDescription: "9/20 tasks",
-      daysLeft: "14 days",
-      category: "development",
-      team: ["RB", "JD", "MP"],
-    },
-    {
-      id: 3,
-      title: "Brand Campaign",
-      description:
-        "Q4 marketing campaign focusing on brand awareness and market penetration strategies",
-      progress: 90,
-      metricsDescription: "18/20 tasks",
-      daysLeft: "3 days",
-      category: "marketing",
-      team: ["EW", "AM"],
-    },
-    {
-      id: 4,
-      title: "User Research",
-      description:
-        "Conducting comprehensive user research to identify pain points and opportunities in current product",
-      progress: 30,
-      metricsDescription: "6/20 tasks",
-      daysLeft: "21 days",
-      category: "research",
-      team: ["SK", "EW", "MP"],
-    },
-    {
-      id: 5,
-      title: "Payment Integration",
-      description:
-        "Implementing new payment gateway and improving checkout process for better conversion",
-      progress: 60,
-      metricsDescription: "12/20 tasks",
-      daysLeft: "10 days",
-      category: "development",
-      team: ["RB", "JD"],
-    },
-    {
-      id: 6,
-      title: "Product Analytics",
-      description:
-        "Setting up advanced analytics and tracking for better understanding of user behavior",
-      progress: 85,
-      metricsDescription: "17/20 tasks",
-      daysLeft: "5 days",
-      category: "research",
-      team: ["MP", "SK", "AM"],
-    },
-    {
-      id: 7,
-      title: "Email Templates",
-      description:
-        "Designing and developing responsive email templates for marketing campaigns",
-      progress: 40,
-      metricsDescription: "8/20 tasks",
-      daysLeft: "12 days",
-      category: "design",
-      team: ["AM", "EW"],
-    },
-    {
-      id: 8,
-      title: "SEO Optimization",
-      description:
-        "Implementing SEO best practices and improving search engine rankings",
-      progress: 70,
-      metricsDescription: "14/20 tasks",
-      daysLeft: "8 days",
-      category: "marketing",
-      team: ["JD", "SK", "MP"],
-    },
-  ];
+  const { projects, loading, error } = useProjects();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [projects, setProjects] = useState(dummyProjects);
   const [confirmModal, setConfirmModal] = useState({ 
     open: false, 
     type: null,
     projectId: null 
   });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Search functionality
   const filteredProjects = projects.filter(project => 
     project.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddProject = (newProject) => {
-    const projectWithId = {
-      ...newProject,
-      id: Date.now()
-    };
-    setProjects((prevProjects) => [...prevProjects, projectWithId]);
-    setIsModalOpen(false);
+  const handleAddProject = async (projectData) => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) return;
+
+      setIsProcessing(true);
+      await projectsService.createProject({
+        ...projectData,
+        team: [currentUser.uid],
+        status: 'active',
+      }, currentUser.uid);
+      
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      // You could add toast notification here
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleDeleteProject = (id) => {
-    setProjects(projects.filter(project => project.id !== id));
+  const handleDeleteProject = async (id) => {
+    try {
+      setIsProcessing(true);
+      await projectsService.deleteProject(id);
+      setConfirmModal({ open: false, type: null, projectId: null });
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      // You could add toast notification here
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleCloseProject = (id) => {
-    // Implement close project logic here
-    console.log('Closing project:', id);
+  const handleCloseProject = async (id) => {
+    try {
+      setIsProcessing(true);
+      await projectsService.closeProject(id);
+      setConfirmModal({ open: false, type: null, projectId: null });
+    } catch (error) {
+      console.error('Failed to close project:', error);
+      // You could add toast notification here
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleProjectAction = (id, type) => {
@@ -146,6 +88,25 @@ const ProjectsPage = () => {
       handleCloseProject(confirmModal.projectId);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader className="w-6 h-6 text-blue-500 animate-spin" />
+          <span className="text-slate-600">Loading projects...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-red-500">Error loading projects: {error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -168,8 +129,10 @@ const ProjectsPage = () => {
             </div>
             <button
               onClick={() => setIsModalOpen(true)}
+              disabled={isProcessing}
               className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 
-                text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
+                text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200
+                disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Project
@@ -204,6 +167,7 @@ const ProjectsPage = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSubmit={handleAddProject}
+          isProcessing={isProcessing}
         />
 
         <ConfirmationModal
@@ -211,6 +175,7 @@ const ProjectsPage = () => {
           onClose={() => setConfirmModal({ open: false, type: null, projectId: null })}
           onConfirm={handleConfirmAction}
           type={confirmModal.type}
+          isProcessing={isProcessing}
         />
       </div>
     </div>
