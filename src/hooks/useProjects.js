@@ -1,6 +1,6 @@
 // src/hooks/useProjects.js
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { authService } from '../firebase/auth';
 
@@ -16,12 +16,11 @@ export const useProjects = () => {
       return;
     }
 
-    const q = query(
-      collection(db, 'projects'),
-      where('team', 'array-contains', currentUser.uid)
-    );
+    // Remove the team filter to get all projects
+    const q = query(collection(db, 'projects'));
 
-    const unsubscribe = onSnapshot(q, 
+    const unsubscribe = onSnapshot(
+      q,
       (snapshot) => {
         const projectsData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -29,6 +28,10 @@ export const useProjects = () => {
           createdAt: doc.data().createdAt?.toDate(),
           updatedAt: doc.data().updatedAt?.toDate()
         }));
+
+        // Sort projects by creation date (newest first)
+        projectsData.sort((a, b) => b.createdAt - a.createdAt);
+        
         setProjects(projectsData);
         setLoading(false);
       },
@@ -44,3 +47,5 @@ export const useProjects = () => {
 
   return { projects, loading, error };
 };
+
+export default useProjects;

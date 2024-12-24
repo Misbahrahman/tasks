@@ -1,4 +1,3 @@
-// src/App.js
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -53,11 +52,21 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Project Tasks Routes */}
         <Route
-          path="/tasks"
+          path="/tasks/:projectId/all"
           element={
             <ProtectedRoute>
-              <Kanban />
+              <Kanban viewType="all" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks/:projectId/my-tasks"
+          element={
+            <ProtectedRoute>
+              <Kanban viewType="my-tasks" />
             </ProtectedRoute>
           }
         />

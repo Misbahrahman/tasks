@@ -1,83 +1,99 @@
 // src/firebase/projectsService.js
-import { 
-    collection, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc,
-    doc,
-    query,
-    where,
-    getDocs,
-    serverTimestamp 
-  } from 'firebase/firestore';
-  import { db } from './config';
-  
-  export const projectsService = {
-    createProject: async (projectData, userId) => {
-      try {
-        const docRef = await addDoc(collection(db, 'projects'), {
-          ...projectData,
-          createdBy: userId,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          status: 'active',
-          progress: 0,
-          metrics: {
-            totalTasks: 0,
-            completedTasks: 0,
-          }
-        });
-        return docRef.id;
-      } catch (error) {
-        throw new Error('Failed to create project: ' + error.message);
-      }
-    },
-  
-    updateProject: async (projectId, updates) => {
-      try {
-        const projectRef = doc(db, 'projects', projectId);
-        await updateDoc(projectRef, {
-          ...updates,
-          updatedAt: serverTimestamp()
-        });
-      } catch (error) {
-        throw new Error('Failed to update project: ' + error.message);
-      }
-    },
-  
-    deleteProject: async (projectId) => {
-      try {
-        await deleteDoc(doc(db, 'projects', projectId));
-      } catch (error) {
-        throw new Error('Failed to delete project: ' + error.message);
-      }
-    },
-  
-    closeProject: async (projectId) => {
-      try {
-        const projectRef = doc(db, 'projects', projectId);
-        await updateDoc(projectRef, {
-          status: 'completed',
-          updatedAt: serverTimestamp()
-        });
-      } catch (error) {
-        throw new Error('Failed to close project: ' + error.message);
-      }
-    },
-  
-    getUserProjects: async (userId) => {
-      try {
-        const q = query(
-          collection(db, 'projects'),
-          where('team', 'array-contains', userId)
-        );
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-      } catch (error) {
-        throw new Error('Failed to fetch projects: ' + error.message);
-      }
+import { collection, addDoc, doc, deleteDoc, updateDoc, serverTimestamp, getDoc, increment, query, where, getDocs } from 'firebase/firestore';
+import { db } from './config';
+
+export const projectsService = {
+  createProject: async (projectData, userId) => {
+    try {
+      // Generate a numeric ID using timestamp
+      const numericId = Date.now().toString();
+
+      const projectsRef = collection(db, 'projects');
+      const docRef = await addDoc(projectsRef, {
+        ...projectData,
+        id: numericId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: userId,
+        metrics: {
+          totalTasks: 0,
+          completedTasks: 0,
+        },
+        metricsDescription: "0/0 tasks",
+        progress: 0
+      });
+
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw error;
     }
-  };
+  },
+
+  updateProjectMetrics: async (projectId) => {
+    try {
+      // Get the project document
+      const projectRef = doc(db, 'projects', projectId);
+      const projectDoc = await getDoc(projectRef);
+
+      if (!projectDoc.exists()) {
+        throw new Error('Project not found');
+      }
+
+      // Get all tasks for this project
+      const tasksRef = collection(db, 'tasks');
+      const q = query(tasksRef, where('projectId', '==', projectId));
+      const taskSnapshot = await getDocs(q);
+
+      // Calculate metrics
+      let totalTasks = taskSnapshot.size;
+      let completedTasks = 0;
+
+      taskSnapshot.forEach(doc => {
+        if (doc.data().status === 'done') {
+          completedTasks++;
+        }
+      });
+
+      // Calculate progress
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      // Update project
+      await updateDoc(projectRef, {
+        'metrics.totalTasks': totalTasks,
+        'metrics.completedTasks': completedTasks,
+        progress,
+        metricsDescription: `${completedTasks}/${totalTasks} tasks`,
+        updatedAt: serverTimestamp()
+      });
+
+    } catch (error) {
+      console.error('Error updating project metrics:', error);
+      throw error;
+    }
+  },
+
+  closeProject: async (projectId) => {
+    try {
+      const projectRef = doc(db, 'projects', projectId);
+      await updateDoc(projectRef, {
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error closing project:', error);
+      throw error;
+    }
+  },
+
+  deleteProject: async (projectId) => {
+    try {
+      await deleteDoc(doc(db, 'projects', projectId));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
+  }
+};
+
+export default projectsService;

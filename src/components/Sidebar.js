@@ -1,18 +1,21 @@
-// src/components/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
 import { User, List, Users, LogOut, Briefcase, LayoutGrid } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../firebase/auth';
+import { useUser } from '../hooks/useUser';
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { userData } = useUser();
   const [userInitials, setUserInitials] = useState('');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   const [selectedNav, setSelectedNav] = useState(() => {
     const path = location.pathname;
     if (path === '/') return 'projects';
+    if (path.includes('/my-tasks')) return 'tasks';
+    if (path.includes('/all')) return 'all-tasks';
     return path.substring(1);
   });
 
@@ -30,11 +33,25 @@ const Sidebar = () => {
 
   const handleNavClick = (navId, path) => {
     setSelectedNav(navId);
-    navigate(path);
+    
+    // If there's a current project and we're navigating to tasks
+    if (userData?.currentProject && (navId === 'tasks' || navId === 'all-tasks')) {
+      navigate(navId === 'tasks' 
+        ? `/tasks/${userData.currentProject}/my-tasks`
+        : `/tasks/${userData.currentProject}/all`
+      );
+    } else if (navId === 'projects') {
+      navigate('/');
+    } else if (navId === 'profile') {
+      navigate('/profile');
+    } else if (!userData?.currentProject && (navId === 'tasks' || navId === 'all-tasks')) {
+      // If no project is selected, navigate to projects page
+      navigate('/');
+    }
   };
 
   const handleLogout = async () => {
-    if (isLoggingOut) return; // Prevent multiple clicks
+    if (isLoggingOut) return;
 
     try {
       setIsLoggingOut(true);
@@ -42,10 +59,18 @@ const Sidebar = () => {
       navigate('/login');
     } catch (error) {
       console.error('Logout failed:', error);
-      // You could add a toast notification here for error feedback
     } finally {
       setIsLoggingOut(false);
     }
+  };
+
+  // Helper function to check if a path is active
+  const isPathActive = (navId) => {
+    if (navId === 'tasks' && location.pathname.includes('/my-tasks')) return true;
+    if (navId === 'all-tasks' && location.pathname.includes('/all')) return true;
+    if (navId === 'projects' && location.pathname === '/') return true;
+    if (navId === 'profile' && location.pathname === '/profile') return true;
+    return false;
   };
 
   return (
@@ -66,15 +91,15 @@ const Sidebar = () => {
         <div className="space-y-2">
           <button
             className={`w-full flex items-center px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-              selectedNav === 'tasks'
+              isPathActive('tasks')
                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
-            onClick={() => handleNavClick('tasks', '/tasks')}
+            onClick={() => handleNavClick('tasks')}
           >
             <List
               className={`w-5 h-5 mr-3 transition-colors ${
-                selectedNav === 'tasks' ? 'text-blue-600' : 'text-slate-400'
+                isPathActive('tasks') ? 'text-blue-600' : 'text-slate-400'
               }`}
             />
             My Tasks
@@ -82,15 +107,15 @@ const Sidebar = () => {
 
           <button
             className={`w-full flex items-center px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-              selectedNav === 'all-tasks'
+              isPathActive('all-tasks')
                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
-            onClick={() => handleNavClick('all-tasks', '/tasks')}
+            onClick={() => handleNavClick('all-tasks')}
           >
             <LayoutGrid
               className={`w-5 h-5 mr-3 transition-colors ${
-                selectedNav === 'all-tasks' ? 'text-blue-600' : 'text-slate-400'
+                isPathActive('all-tasks') ? 'text-blue-600' : 'text-slate-400'
               }`}
             />
             All Tasks
@@ -98,15 +123,15 @@ const Sidebar = () => {
 
           <button
             className={`w-full flex items-center px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-              selectedNav === 'projects'
+              isPathActive('projects')
                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
-            onClick={() => handleNavClick('projects', '/')}
+            onClick={() => handleNavClick('projects')}
           >
             <Briefcase
               className={`w-5 h-5 mr-3 transition-colors ${
-                selectedNav === 'projects' ? 'text-blue-600' : 'text-slate-400'
+                isPathActive('projects') ? 'text-blue-600' : 'text-slate-400'
               }`}
             />
             Projects
@@ -116,15 +141,15 @@ const Sidebar = () => {
         <div className="mt-8 pt-6 border-t border-slate-100 space-y-2">
           <button
             className={`w-full flex items-center px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-              selectedNav === 'profile'
+              isPathActive('profile')
                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
-            onClick={() => handleNavClick('profile', '/profile')}
+            onClick={() => handleNavClick('profile')}
           >
             <User
               className={`w-5 h-5 mr-3 transition-colors ${
-                selectedNav === 'profile' ? 'text-blue-600' : 'text-slate-400'
+                isPathActive('profile') ? 'text-blue-600' : 'text-slate-400'
               }`}
             />
             My Profile

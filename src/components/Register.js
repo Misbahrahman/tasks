@@ -15,14 +15,7 @@ const RegisterPage = () => {
   });
 
   const roles = [
-    'Team Member',
-    'Frontend Developer',
-    'Backend Developer',
-    'UI Designer',
-    'UX Designer',
-    'Project Manager',
-    'Product Manager',
-    'QA Engineer'
+    'Team Member'
   ];
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);

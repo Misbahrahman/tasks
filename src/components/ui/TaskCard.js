@@ -1,12 +1,15 @@
+// src/components/ui/TaskCard.jsx
 import React, { useState, useRef } from "react";
 import { X, Calendar } from "lucide-react";
 import MoreButton from "./MoreButton";
+import { AvatarGroup } from "./Avatar";
+import { useUserDetails } from "../../hooks/useUserDetails";
 
 const TaskCard = ({
   id,
   title,
   description,
-  assignees,
+  assignees = [],
   priority,
   dueDate,
   columnId,
@@ -17,6 +20,7 @@ const TaskCard = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isDraggingRef = useRef(false);
   const isClickingMenuRef = useRef(false);
+  const { users: assigneeUsers, loading: loadingUsers } = useUserDetails(assignees);
   
   const priorityStyles = {
     high: "bg-rose-50 text-rose-700 ring-rose-600/20",
@@ -28,7 +32,7 @@ const TaskCard = ({
   const isOverdue = () => {
     if (!dueDate) return false;
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    today.setHours(0, 0, 0, 0);
     const taskDueDate = new Date(dueDate);
     taskDueDate.setHours(0, 0, 0, 0);
     return taskDueDate < today;
@@ -152,21 +156,14 @@ const TaskCard = ({
           )}
         </div>
       </div>
-      <div className="mt-5 flex items-center justify-between">
-        <div className="flex -space-x-2 hover:space-x-1 transition-all duration-300">
-          {assignees.map((initials) => (
-            <div
-              key={initials}
-              className="w-8 h-8 rounded-full border-2 border-white 
-                flex items-center justify-center text-xs font-medium text-white 
-                shadow-md transition-transform duration-300
-                hover:scale-110 hover:z-10
-                bg-gradient-to-br from-blue-500 to-blue-600"
-            >
-              {initials}
-            </div>
-          ))}
-        </div>
+
+      <div className="mt-5">
+        {!loadingUsers && assigneeUsers.length > 0 && (
+          <AvatarGroup 
+            users={assigneeUsers}
+            max={5}
+          />
+        )}
       </div>
     </div>
   );

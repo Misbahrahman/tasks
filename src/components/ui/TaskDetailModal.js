@@ -1,15 +1,22 @@
+// src/components/TaskDetailModal.jsx
 import React, { useEffect, useState } from 'react';
 import { Calendar, X, Edit2, Clock, Check, MessageSquare, AlertCircle } from 'lucide-react';
+import { useUserDetails } from '../../hooks/useUserDetails';
+import Avatar from './Avatar';
+
 
 const TaskDetailModal = ({ isOpen, onClose, task }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
   const [notes, setNotes] = useState('');
-  const [activeTab, setActiveTab] = useState('details'); // 'details', 'notes', 'history'
+  const [activeTab, setActiveTab] = useState('details');
+  const { users: assigneeUsers, loading: loadingAssignees } = useUserDetails(task?.assignees || []);
+
   const [taskNotes, setTaskNotes] = useState([
     { timestamp: '2024-03-23 02:30 PM', user: 'JD', content: 'Initial project setup completed' },
     { timestamp: '2024-03-23 04:15 PM', user: 'AM', content: 'Added documentation for the API endpoints' }
   ]);
+
   const [taskHistory, setTaskHistory] = useState([
     { type: 'created', timestamp: '2024-03-23 10:00 AM', user: 'JD', details: 'Task created' },
     { type: 'updated', timestamp: '2024-03-23 02:30 PM', user: 'AM', details: 'Changed priority from Medium to High' },
@@ -22,6 +29,93 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
     low: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
   };
 
+  const getAvatarColor = (initials) => {
+    const colors = ['blue', 'teal', 'cyan', 'indigo', 'fuchsia', 'lime', 'yellow'];
+    const index = initials.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
+  // Components
+  const AssigneesSection = () => {
+    if (loadingAssignees) {
+      return (
+        <div className="flex gap-2">
+          {[1, 2].map((n) => (
+            <div key={n} className="w-10 h-10 rounded-full bg-slate-200 animate-pulse" />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-wrap gap-3">
+        {assigneeUsers.map((user) => (
+          <div key={user.id} className="flex flex-col items-center gap-1">
+            <Avatar
+              initials={user.initials}
+              avatarColor={user.avatarColor}
+              size="lg"
+              className="hover:scale-110 transition-transform duration-300"
+            />
+            <span className="text-xs text-slate-600 font-medium">
+              {user.name || user.initials}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const NoteItem = ({ note }) => (
+    <div className="p-4 rounded-lg bg-slate-50">
+      <div className="flex items-center gap-3 mb-2">
+        <Avatar
+          initials={note.user}
+          avatarColor={getAvatarColor(note.user)}
+          size="sm"
+        />
+        <div>
+          <span className="text-sm font-medium text-slate-700">{note.user}</span>
+          <span className="text-xs text-slate-500 ml-2">{note.timestamp}</span>
+        </div>
+      </div>
+      <p className="text-sm text-slate-600 whitespace-pre-wrap ml-10">
+        {note.content}
+      </p>
+    </div>
+  );
+
+  const HistoryItem = ({ event }) => (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
+      <Avatar
+        initials={event.user}
+        avatarColor={getAvatarColor(event.user)}
+        size="sm"
+      />
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium text-slate-700">{event.user}</span>
+          <span className="text-xs text-slate-500">{event.timestamp}</span>
+        </div>
+        <p className="text-sm text-slate-600">{event.details}</p>
+      </div>
+    </div>
+  );
+
+  const TabButton = ({ id, label, icon: Icon }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+        ${activeTab === id 
+          ? 'bg-slate-100 text-slate-800' 
+          : 'text-slate-600 hover:bg-slate-50'}`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+
+  // Event handlers
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') onClose();
@@ -43,22 +137,13 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
       const timestamp = new Date().toLocaleString();
       const user = 'JD';
       
-      // Add the note to taskNotes
-      const newNote = {
-        timestamp,
-        user,
-        content: notes
-      };
-      setTaskNotes(prev => [...prev, newNote]);
-      
-      // Add a corresponding entry to taskHistory
-      const historyEntry = {
+      setTaskNotes(prev => [...prev, { timestamp, user, content: notes }]);
+      setTaskHistory(prev => [...prev, {
         type: 'updated',
         timestamp,
         user,
         details: `Added note: "${notes.length > 50 ? notes.slice(0, 50) + '...' : notes}"`
-      };
-      setTaskHistory(prev => [...prev, historyEntry]);
+      }]);
       
       setNotes('');
     }
@@ -73,19 +158,6 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
     }]);
     setIsEditing(false);
   };
-
-  const TabButton = ({ id, label, icon: Icon }) => (
-    <button
-      onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-        ${activeTab === id 
-          ? 'bg-slate-100 text-slate-800' 
-          : 'text-slate-600 hover:bg-slate-50'}`}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
-  );
 
   if (!isOpen) return null;
 
@@ -190,19 +262,7 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
 
                 <div>
                   <h4 className="text-sm font-medium text-slate-700 mb-3">Assignees</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {task.assignees.map((initials) => (
-                      <div
-                        key={initials}
-                        className="w-8 h-8 rounded-full flex items-center justify-center 
-                          text-xs font-medium text-white shadow-md
-                          transition-transform duration-300 hover:scale-110
-                          bg-gradient-to-br from-blue-500 to-blue-600"
-                      >
-                        {initials}
-                      </div>
-                    ))}
-                  </div>
+                  <AssigneesSection />
                 </div>
               </div>
             )}
@@ -230,19 +290,7 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
                 {/* Notes List */}
                 <div className="space-y-4 max-h-[400px] overflow-y-auto">
                   {taskNotes.map((note, index) => (
-                    <div key={index} className="p-4 rounded-lg bg-slate-50">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-slate-700">
-                          {note.user}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {note.timestamp}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-600 whitespace-pre-wrap">
-                        {note.content}
-                      </p>
-                    </div>
+                    <NoteItem key={index} note={note} />
                   ))}
                 </div>
               </div>
@@ -252,25 +300,7 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
               <div className="p-6">
                 <div className="space-y-4 max-h-[500px] overflow-y-auto">
                   {taskHistory.map((event, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
-                      <div className="p-2 rounded-full bg-white shadow-sm">
-                        {event.type === 'created' && <Clock className="w-4 h-4 text-blue-500" />}
-                        {event.type === 'updated' && <Edit2 className="w-4 h-4 text-amber-500" />}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-slate-700">
-                            {event.user}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {event.timestamp}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-600">
-                          {event.details}
-                        </p>
-                      </div>
-                    </div>
+                    <HistoryItem key={index} event={event} />
                   ))}
                 </div>
               </div>
