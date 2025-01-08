@@ -1,36 +1,31 @@
 // src/components/ProjectCard.jsx
-import React, { useState } from 'react';
-import { Calendar, CheckCircle, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useUser } from '../../hooks/useUser';
-import { useUserDetails } from '../../hooks/useUserDetails';
-import MoreButton from './MoreButton';
-import { AvatarGroup } from './Avatar';
+import React, { useState } from "react";
+import { Calendar, CheckCircle, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "../../hooks/useUser";
+import { useUserDetails } from "../../hooks/useUserDetails";
+import MoreButton from "./MoreButton";
+import { AvatarGroup } from "./Avatar";
 
-const ProjectCard = ({ 
-  project, 
-  onDelete,
-  onClose,
-  isProcessing 
-}) => {
+const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
   const navigate = useNavigate();
   const { setCurrentProject } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
-  
-  const { 
+
+  const {
     id,
-    title, 
-    description, 
+    title,
+    description,
     team = [],
     metrics = { completedTasks: 0, totalTasks: 0 },
-    category = 'development',
+    category = "development",
     dueDate,
-    status
+    status,
   } = project;
 
   const { users: teamMembers, loading: loadingTeam } = useUserDetails(team);
-  
+
   // Calculate real progress based on tasks
   const calculateProgress = () => {
     if (!metrics.totalTasks) return 0;
@@ -40,15 +35,15 @@ const ProjectCard = ({
   const handleProjectSelect = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     try {
       if (isSelecting) return;
       setIsSelecting(true);
-      
+
       await setCurrentProject(id);
       navigate(`/tasks/${id}/all`);
     } catch (error) {
-      console.error('Failed to select project:', error);
+      console.error("Failed to select project:", error);
     } finally {
       setIsSelecting(false);
     }
@@ -61,32 +56,32 @@ const ProjectCard = ({
       setIsMenuOpen(false);
       await actionFn(projectId);
     } catch (error) {
-      console.error('Failed to perform action:', error);
+      console.error("Failed to perform action:", error);
     }
   };
 
   const getProgressColor = (progress) => {
-    if (progress >= 75) return 'bg-green-500';
-    if (progress >= 50) return 'bg-blue-500';
-    if (progress >= 25) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (progress >= 75) return "bg-green-500";
+    if (progress >= 50) return "bg-blue-500";
+    if (progress >= 25) return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   const getCategoryColor = (category) => {
     const colors = {
-      development: 'bg-blue-50 text-blue-600',
-      design: 'bg-purple-50 text-purple-600',
-      marketing: 'bg-green-50 text-green-600',
-      research: 'bg-amber-50 text-amber-600'
+      development: "bg-blue-50 text-blue-600",
+      design: "bg-purple-50 text-purple-600",
+      marketing: "bg-green-50 text-green-600",
+      research: "bg-amber-50 text-amber-600",
     };
-    return colors[category] || 'bg-slate-50 text-slate-600';
+    return colors[category] || "bg-slate-50 text-slate-600";
   };
 
   const getStatusColor = () => {
     const colors = {
-      active: 'bg-green-50 text-green-600',
-      completed: 'bg-blue-50 text-blue-600',
-      archived: 'bg-slate-50 text-slate-600'
+      active: "bg-green-50 text-green-600",
+      completed: "bg-blue-50 text-blue-600",
+      archived: "bg-slate-50 text-slate-600",
     };
     return colors[status] || colors.active;
   };
@@ -107,25 +102,35 @@ const ProjectCard = ({
   };
 
   return (
-    <div 
+    <div
       onClick={handleProjectSelect}
       className={`w-[380px] bg-white rounded-[32px] p-6 
-        hover:shadow-lg transition-all duration-300 ease-in-out 
-        hover:translate-y-[-2px] cursor-pointer group relative
-        ${isSelecting || isProcessing ? 'opacity-75 pointer-events-none' : ''}`}
+    ${status !== "completed" ? "hover:shadow-lg hover:translate-y-[-2px]" : ""}
+    transition-all duration-300 ease-in-out 
+    cursor-pointer group relative
+    ${isSelecting || isProcessing ? "opacity-75 pointer-events-none" : ""}
+    ${status === "completed" ? "bg-slate-50 opacity-75" : ""}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-1 
-            group-hover:text-blue-600 transition-colors">
+          <h3
+            className="text-lg font-semibold text-slate-800 mb-1 
+            group-hover:text-blue-600 transition-colors"
+          >
             {title}
           </h3>
           <div className="flex items-center gap-2">
-            <span className={`text-xs px-2.5 py-1 rounded-full ${getCategoryColor(category)}`}>
+            <span
+              className={`text-xs px-2.5 py-1 rounded-full ${getCategoryColor(
+                category
+              )}`}
+            >
               {category}
             </span>
-            <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusColor()}`}>
+            <span
+              className={`text-xs px-2.5 py-1 rounded-full ${getStatusColor()}`}
+            >
               {status}
             </span>
           </div>
@@ -144,7 +149,7 @@ const ProjectCard = ({
               />
               <div className="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                 <div className="py-1">
-                  {status !== 'completed' && (
+                  {status !== "completed" && (
                     <button
                       onClick={handleMenuAction(onClose, id)}
                       className="flex w-full items-center px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
@@ -170,9 +175,7 @@ const ProjectCard = ({
       </div>
 
       {/* Description */}
-      <p className="text-sm text-slate-500 mb-6 line-clamp-2">
-        {description}
-      </p>
+      <p className="text-sm text-slate-500 mb-6 line-clamp-2">{description}</p>
 
       {/* Progress Section */}
       <div className="space-y-4">
@@ -187,7 +190,9 @@ const ProjectCard = ({
           </div>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className={`h-full ${getProgressColor(calculateProgress())} rounded-full 
+              className={`h-full ${getProgressColor(
+                calculateProgress()
+              )} rounded-full 
                 transition-all duration-300 ease-out`}
               style={{ width: `${calculateProgress()}%` }}
             />
@@ -198,10 +203,7 @@ const ProjectCard = ({
       {/* Footer */}
       <div className="mt-6 flex items-center justify-between">
         {!loadingTeam && teamMembers.length > 0 && (
-          <AvatarGroup 
-            users={teamMembers}
-            max={5}
-          />
+          <AvatarGroup users={teamMembers} max={5} />
         )}
         <div className="flex items-center">
           <Calendar className="w-3 h-3 text-pink-500 mr-1" />

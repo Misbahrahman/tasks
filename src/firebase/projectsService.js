@@ -75,7 +75,17 @@ export const projectsService = {
 
   closeProject: async (projectId) => {
     try {
-      const projectRef = doc(db, 'projects', projectId);
+      const projectsRef = collection(db, "projects");
+      const q = query(projectsRef, where("id", "==", projectId)); 
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+          alert("No project found with the provided ID.");
+          return;
+      }
+
+      const projectRef = querySnapshot.docs[0].ref;
+
       await updateDoc(projectRef, {
         status: 'completed',
         updatedAt: serverTimestamp()
@@ -88,7 +98,20 @@ export const projectsService = {
 
   deleteProject: async (projectId) => {
     try {
-      await deleteDoc(doc(db, 'projects', projectId));
+
+      const projectsRef = collection(db, "projects");
+      const q = query(projectsRef, where("id", "==", projectId)); 
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+          alert("No project found with the provided ID.");
+          return;
+      }
+
+      const docRef = querySnapshot.docs[0].ref;
+
+      await deleteDoc(docRef);
+
     } catch (error) {
       console.error('Error deleting project:', error);
       throw error;
