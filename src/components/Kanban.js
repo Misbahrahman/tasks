@@ -9,6 +9,7 @@ import TaskDetailModal from "./ui/TaskDetailModal";
 import { useTasks } from "../hooks/useTasks";
 import { taskService } from "../firebase/taskService";
 import { useUser } from "../hooks/useUser";
+import projectsService from "../firebase/projectsService";
 
 
 
@@ -30,6 +31,7 @@ const TaskColumn = memo(
     title,
     tasks = [],
     columnId,
+    projectId, // Add projectId to props
     onDeleteTask,
     setSelectedTask,
     setIsTaskDetailModalOpen,
@@ -57,12 +59,18 @@ const TaskColumn = memo(
 
           if (sourceColumnId !== columnId) {
             await taskService.updateTaskStatus(taskId, columnId);
+            // Now we have access to projectId
+            if (columnId === 'done') {
+              await projectsService.updateProjectMetrics(projectId, 'STATUS_CHANGE', 'done');
+            } else if (sourceColumnId === 'done') {
+              await projectsService.updateProjectMetrics(projectId, 'STATUS_CHANGE', 'from_done');
+            }
           }
         } catch (err) {
           console.error("Error updating task status:", err);
         }
       },
-      [columnId]
+      [columnId, projectId] // Add projectId to dependencies
     );
 
     return (
@@ -76,10 +84,8 @@ const TaskColumn = memo(
         <div className="px-6 py-4 border-b border-slate-100">
           <div className="flex items-center justify-between">
             <h2 className="font-medium text-slate-800">{title}</h2>
-            <span
-              className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 
-            px-2.5 py-1 rounded-lg text-sm font-medium"
-            >
+            <span className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 
+              px-2.5 py-1 rounded-lg text-sm font-medium">
               {tasks.length}
             </span>
           </div>
@@ -91,7 +97,7 @@ const TaskColumn = memo(
                 key={task.id}
                 {...task}
                 columnId={columnId}
-                onDelete={onDeleteTask}
+                onDelete={() => onDeleteTask(task.id, columnId)} // Pass columnId as currentStatus
                 setSelectedTask={setSelectedTask}
                 setIsTaskDetailModalOpen={setIsTaskDetailModalOpen}
               />
@@ -114,19 +120,18 @@ const Kanban = ({ viewType }) => {
     viewType === "my-tasks" ? userData?.uid : null
   );
 
-  console.log(tasks, project);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
-  const handleDeleteTask = useCallback(async (taskId) => {
+  const handleDeleteTask = useCallback(async (taskId, currentStatus) => {
     try {
       await taskService.deleteTask(taskId);
+      await projectsService.updateProjectMetrics(projectId, 'DELETE_TASK', currentStatus);
     } catch (error) {
       console.error("Failed to delete task:", error);
     }
-  }, []);
+  }, [projectId]);
 
   if (loading) {
     return (
@@ -209,6 +214,7 @@ const Kanban = ({ viewType }) => {
                 }
                 tasks={tasks[status]}
                 columnId={status}
+                projectId={projectId} 
                 onDeleteTask={handleDeleteTask}
                 setSelectedTask={setSelectedTask}
                 setIsTaskDetailModalOpen={setIsTaskDetailModalOpen}
@@ -220,7 +226,7 @@ const Kanban = ({ viewType }) => {
         <TaskModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          projectId={currentProjectId}
+          projectId={projectId}
         />
 
         <TaskDetailModal

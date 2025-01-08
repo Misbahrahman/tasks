@@ -6,8 +6,9 @@
   import AssigneeSelect from "../ui/AssignEmployee";
   import { TextArea, TextInput } from "../ui/TextInput";
   import { taskService } from "../../firebase/taskService";
+  import { projectsService } from "../../firebase/projectsService";
   import { authService } from "../../firebase/auth";
-  import { useProjects } from "../../hooks/useProjects";
+
 
   const TaskModal = ({ isOpen, onClose , projectId}) => {
 
@@ -51,8 +52,9 @@
           dueDate: formData.dueDate,
         }, currentUser.uid);
 
-        console.log(res , "checkafetr");
-        
+        //update project metrics (add in total tasks)
+        await projectsService.updateProjectMetrics(projectId, 'CREATE_TASK');
+
 
         onClose();
         setFormData({

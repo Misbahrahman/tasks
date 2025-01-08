@@ -30,43 +30,63 @@ export const projectsService = {
     }
   },
 
-  updateProjectMetrics: async (projectId) => {
+  updateProjectMetrics : async (projectId, actionType, currentStatus = null) => {
     try {
-      // Get the project document
-      const projectRef = doc(db, 'projects', projectId);
-      const projectDoc = await getDoc(projectRef);
-
-      if (!projectDoc.exists()) {
-        throw new Error('Project not found');
+      // Get current project metrics
+      const projectsRef = collection(db, "projects");
+      const projectQuery = query(projectsRef, where("id", "==", projectId));
+      const querySnapshot = await getDocs(projectQuery);
+  
+      if (querySnapshot.empty) {
+        console.error("No project found with the provided ID.");
+        return;
       }
-
-      // Get all tasks for this project
-      const tasksRef = collection(db, 'tasks');
-      const q = query(tasksRef, where('projectId', '==', projectId));
-      const taskSnapshot = await getDocs(q);
-
-      // Calculate metrics
-      let totalTasks = taskSnapshot.size;
-      let completedTasks = 0;
-
-      taskSnapshot.forEach(doc => {
-        if (doc.data().status === 'done') {
-          completedTasks++;
-        }
-      });
-
-      // Calculate progress
+  
+      const docRef = querySnapshot.docs[0].ref;
+      const projectData = querySnapshot.docs[0].data();
+      
+      let { totalTasks = 0, completedTasks = 0 } = projectData.metrics || {};
+  
+      // Update metrics based on action type
+      switch (actionType) {
+        case 'CREATE_TASK':
+          totalTasks += 1;
+          break;
+          
+        case 'DELETE_TASK':
+          totalTasks -= 1;
+          // If deleting a completed task, decrease completedTasks
+          if (currentStatus === 'done') {
+            completedTasks = Math.max(0, completedTasks - 1);
+          }
+          break;
+          
+        case 'STATUS_CHANGE':
+          if (currentStatus === 'done') {
+            completedTasks += 1;
+          } else if (currentStatus === 'from_done') {
+            completedTasks = Math.max(0, completedTasks - 1);
+          }
+          break;
+          
+        default:
+          console.warn('Unknown action type:', actionType);
+          return;
+      }
+  
+      // Calculate progress percentage
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-      // Update project
-      await updateDoc(projectRef, {
+  
+      // Update project document
+      await updateDoc(docRef, {
         'metrics.totalTasks': totalTasks,
         'metrics.completedTasks': completedTasks,
         progress,
         metricsDescription: `${completedTasks}/${totalTasks} tasks`,
         updatedAt: serverTimestamp()
       });
-
+  
+      return { totalTasks, completedTasks, progress };
     } catch (error) {
       console.error('Error updating project metrics:', error);
       throw error;
