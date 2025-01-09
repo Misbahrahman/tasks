@@ -12,10 +12,12 @@ const TaskCard = ({
   assignees = [],
   priority,
   dueDate,
+  status,
+  comments = [],
+  history = [],
   columnId,
   onDelete,
-  setSelectedTask,
-  setIsTaskDetailModalOpen,
+  onClick
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isDraggingRef = useRef(false);
@@ -54,15 +56,17 @@ const TaskCard = ({
 
   const handleMouseUp = () => {
     if (!isDraggingRef.current && !isClickingMenuRef.current) {
-      setSelectedTask({
+      onClick?.({
         id,
         title,
         description,
         assignees,
         priority,
         dueDate,
+        status,
+        comments,
+        history
       });
-      setIsTaskDetailModalOpen(true);
     }
     isDraggingRef.current = false;
     isClickingMenuRef.current = false;
@@ -81,6 +85,12 @@ const TaskCard = ({
 
   const handleDragEnd = (e) => {
     e.target.classList.remove("opacity-50");
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDelete?.(id, columnId);
+    setIsMenuOpen(false);
   };
 
   return (
@@ -119,14 +129,21 @@ const TaskCard = ({
                 {dueDate}
               </span>
             )}
+            {comments?.length > 0 && (
+              <span className="text-xs text-slate-500 bg-slate-50/80 px-2.5 py-1.5 rounded-md ring-1 ring-inset ring-slate-200/60 shadow-sm">
+                {comments.length} comment{comments.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           <div className="group-hover:translate-x-0.5 transition-transform duration-300">
             <h3 className={`font-medium mb-1 ${isOverdue() ? 'text-rose-900' : 'text-slate-800'}`}>
               {title}
             </h3>
-            <p className={`text-sm leading-relaxed ${isOverdue() ? 'text-rose-600' : 'text-slate-600'}`}>
-              {description}
-            </p>
+            {description && (
+              <p className={`text-sm leading-relaxed line-clamp-2 ${isOverdue() ? 'text-rose-600' : 'text-slate-600'}`}>
+                {description}
+              </p>
+            )}
           </div>
         </div>
         <div className="relative task-menu-button">
@@ -140,11 +157,7 @@ const TaskCard = ({
               <div className="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                 <div className="py-1">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(id, columnId);
-                      setIsMenuOpen(false);
-                    }}
+                    onClick={handleDelete}
                     className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                   >
                     <X className="w-4 h-4 mr-2" />

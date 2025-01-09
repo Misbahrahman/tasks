@@ -1,27 +1,45 @@
-// src/components/TaskDetailModal.jsx
-import React, { useEffect, useState } from 'react';
-import { Calendar, X, Edit2, Clock, Check, MessageSquare, AlertCircle } from 'lucide-react';
+// src/components/ui/TaskDetailModal.jsx
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Calendar, X, Edit2, Clock, Check, MessageSquare, AlertCircle, Loader } from 'lucide-react';
 import { useUserDetails } from '../../hooks/useUserDetails';
+import { authService } from '../../firebase/auth';
 import Avatar from './Avatar';
 
-
-const TaskDetailModal = ({ isOpen, onClose, task }) => {
+const TaskDetailModal = ({ 
+  isOpen, 
+  onClose, 
+  task,
+  onTaskUpdate,
+  onNoteAdd,
+  onStatusChange,
+  isLoading = false
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
-  const [notes, setNotes] = useState('');
+  const [comment, setComment] = useState('');
   const [activeTab, setActiveTab] = useState('details');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { users: assigneeUsers, loading: loadingAssignees } = useUserDetails(task?.assignees || []);
+  const currentUser = authService.getCurrentUser();
+  const commentsEndRef = useRef(null);
 
-  const [taskNotes, setTaskNotes] = useState([
-    { timestamp: '2024-03-23 02:30 PM', user: 'JD', content: 'Initial project setup completed' },
-    { timestamp: '2024-03-23 04:15 PM', user: 'AM', content: 'Added documentation for the API endpoints' }
-  ]);
+  // Reset states when task changes
+  useEffect(() => {
+    if (task) {
+      setEditedTask(task);
+      // Scroll to bottom if new comment added
+      if (activeTab === 'notes' && 
+          task.comments?.length > (editedTask?.comments?.length || 0)) {
+        scrollToBottom();
+      }
+    }
+  }, [task, activeTab]);
 
-  const [taskHistory, setTaskHistory] = useState([
-    { type: 'created', timestamp: '2024-03-23 10:00 AM', user: 'JD', details: 'Task created' },
-    { type: 'updated', timestamp: '2024-03-23 02:30 PM', user: 'AM', details: 'Changed priority from Medium to High' },
-    { type: 'updated', timestamp: '2024-03-23 04:15 PM', user: 'JD', details: 'Updated task description' }
-  ]);
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
 
   const priorityStyles = {
     high: "bg-rose-50 text-rose-700 ring-rose-600/20",
@@ -34,6 +52,18 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
     const index = initials.charCodeAt(0) % colors.length;
     return colors[index];
   };
+
+  const handleStatusChange = useCallback(async (newStatus) => {
+    if (!task?.id || !currentUser) return;
+    try {
+      setIsSubmitting(true);
+      await onStatusChange(task.id, newStatus);
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [task?.id, currentUser, onStatusChange]);
 
   // Components
   const AssigneesSection = () => {
@@ -53,7 +83,7 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
           <div key={user.id} className="flex flex-col items-center gap-1">
             <Avatar
               initials={user.initials}
-              avatarColor={user.avatarColor}
+              avatarColor={user.avatarColor || getAvatarColor(user.initials)}
               size="lg"
               className="hover:scale-110 transition-transform duration-300"
             />
@@ -66,43 +96,91 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
     );
   };
 
-  const NoteItem = ({ note }) => (
-    <div className="p-4 rounded-lg bg-slate-50">
-      <div className="flex items-center gap-3 mb-2">
+  const CommentItem = ({ comment }) => {
+    const { users, loading } = useUserDetails([comment.createdBy]);
+    const user = users[0];
+  
+    if (loading) {
+      return (
+        <div className="p-4 rounded-lg bg-slate-50 animate-pulse">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-full bg-slate-200" />
+            <div className="space-y-2">
+              <div className="w-24 h-4 bg-slate-200 rounded" />
+              <div className="w-32 h-3 bg-slate-200 rounded" />
+            </div>
+          </div>
+          <div className="ml-10 w-full h-4 bg-slate-200 rounded mt-2" />
+        </div>
+      );
+    }
+  
+    return (
+      <div className="p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+        <div className="flex items-center gap-3 mb-2">
+          <Avatar
+            initials={user?.initials || '??'}
+            avatarColor={user?.avatarColor || getAvatarColor(user?.name || 'XX')}
+            size="sm"
+          />
+          <div>
+            <span className="text-sm font-medium text-slate-700">
+              {user?.name || 'Unknown User'}
+            </span>
+            <span className="text-xs text-slate-500 ml-2">
+              {comment.createdAt?.toDate().toLocaleString()}
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 whitespace-pre-wrap ml-10">
+          {comment.content}
+        </p>
+      </div>
+    );
+  };
+
+  const HistoryItem = ({ event }) => {
+    const { users, loading } = useUserDetails([event.createdBy]);
+    const user = users[0];
+  
+    if (loading) {
+      return (
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 animate-pulse">
+          <div className="w-8 h-8 rounded-full bg-slate-200" />
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-4 bg-slate-200 rounded" />
+              <div className="w-32 h-3 bg-slate-200 rounded" />
+            </div>
+            <div className="w-full h-4 bg-slate-200 rounded" />
+          </div>
+        </div>
+      );
+    }
+  
+    return (
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
         <Avatar
-          initials={note.user}
-          avatarColor={getAvatarColor(note.user)}
+          initials={user?.initials || '??'}
+          avatarColor={user?.avatarColor || getAvatarColor(user?.name || 'XX')}
           size="sm"
         />
-        <div>
-          <span className="text-sm font-medium text-slate-700">{note.user}</span>
-          <span className="text-xs text-slate-500 ml-2">{note.timestamp}</span>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium text-slate-700">
+              {user?.name || 'Unknown User'}
+            </span>
+            <span className="text-xs text-slate-500">
+              {event.createdAt?.toDate().toLocaleString()}
+            </span>
+          </div>
+          <p className="text-sm text-slate-600">{event.description}</p>
         </div>
       </div>
-      <p className="text-sm text-slate-600 whitespace-pre-wrap ml-10">
-        {note.content}
-      </p>
-    </div>
-  );
+    );
+  };
 
-  const HistoryItem = ({ event }) => (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
-      <Avatar
-        initials={event.user}
-        avatarColor={getAvatarColor(event.user)}
-        size="sm"
-      />
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-slate-700">{event.user}</span>
-          <span className="text-xs text-slate-500">{event.timestamp}</span>
-        </div>
-        <p className="text-sm text-slate-600">{event.details}</p>
-      </div>
-    </div>
-  );
-
-  const TabButton = ({ id, label, icon: Icon }) => (
+  const TabButton = ({ id, label, icon: Icon, count }) => (
     <button
       onClick={() => setActiveTab(id)}
       className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
@@ -111,7 +189,12 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
           : 'text-slate-600 hover:bg-slate-50'}`}
     >
       <Icon className="w-4 h-4" />
-      {label}
+      <span>{label}</span>
+      {count > 0 && (
+        <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-600">
+          {count}
+        </span>
+      )}
     </button>
   );
 
@@ -132,34 +215,63 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
     };
   }, [isOpen, onClose]);
 
-  const handleNotesSubmit = () => {
-    if (notes.trim()) {
-      const timestamp = new Date().toLocaleString();
-      const user = 'JD';
-      
-      setTaskNotes(prev => [...prev, { timestamp, user, content: notes }]);
-      setTaskHistory(prev => [...prev, {
-        type: 'updated',
-        timestamp,
-        user,
-        details: `Added note: "${notes.length > 50 ? notes.slice(0, 50) + '...' : notes}"`
-      }]);
-      
-      setNotes('');
+  const handleCommentSubmit = async () => {
+    if (!comment.trim() || isSubmitting || !currentUser?.uid || !task?.id) return;
+
+    try {
+      setIsSubmitting(true);
+      await onNoteAdd(task.id, {
+        content: comment.trim(),
+      });
+      setComment('');
+      // Scroll will happen automatically due to useEffect
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSaveChanges = () => {
-    setTaskHistory(prev => [...prev, {
-      type: 'updated',
-      timestamp: new Date().toLocaleString(),
-      user: 'JD',
-      details: 'Updated task details'
-    }]);
-    setIsEditing(false);
+  const handleSaveChanges = async () => {
+    if (isSubmitting || !currentUser?.uid || !task?.id) return;
+
+    try {
+      setIsSubmitting(true);
+      await onTaskUpdate(task.id, {
+        title: editedTask.title,
+        description: editedTask.description,
+        priority: editedTask.priority,
+        dueDate: editedTask.dueDate
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !task) return null;
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-25">
+        <div className="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-4">
+          <Loader className="w-6 h-6 text-blue-500 animate-spin" />
+          <span className="text-slate-600">Loading task details...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Sort comments and history by date
+  const sortedComments = task.comments?.slice().sort((a, b) => 
+    b.createdAt?.toDate().getTime() - a.createdAt?.toDate().getTime()
+  ) || [];
+
+  const sortedHistory = task.history?.slice().sort((a, b) => 
+    b.createdAt?.toDate().getTime() - a.createdAt?.toDate().getTime()
+  ) || [];
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -189,13 +301,15 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsEditing(!isEditing)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-2"
+                  disabled={isSubmitting}
+                  className="text-slate-400 hover:text-slate-600 transition-colors p-2 disabled:opacity-50"
                 >
                   {isEditing ? <Check className="w-5 h-5" /> : <Edit2 className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={onClose}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-2"
+                  disabled={isSubmitting}
+                  className="text-slate-400 hover:text-slate-600 transition-colors p-2 disabled:opacity-50"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -208,6 +322,7 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
                   value={editedTask.priority}
                   onChange={e => setEditedTask({...editedTask, priority: e.target.value})}
                   className="text-sm px-3 py-1.5 rounded-md border"
+                  disabled={isSubmitting}
                 >
                   <option value="low">Low Priority</option>
                   <option value="medium">Medium Priority</option>
@@ -220,6 +335,18 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
                   {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
                 </span>
               )}
+
+              <select
+                value={task.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="text-sm px-3 py-1.5 rounded-md border"
+                disabled={isSubmitting}
+              >
+                <option value="todo">To Do</option>
+                <option value="inProgress">In Progress</option>
+                <option value="done">Done</option>
+              </select>
+
               {task.dueDate && (
                 <span className="flex items-center text-sm text-slate-500 bg-slate-50/80 
                   px-3 py-1.5 rounded-md ring-1 ring-inset ring-slate-200/60 shadow-sm"
@@ -235,8 +362,18 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
           <div className="px-6 py-2 border-b border-slate-200 bg-white">
             <div className="flex gap-2">
               <TabButton id="details" label="Details" icon={AlertCircle} />
-              <TabButton id="notes" label="Notes" icon={MessageSquare} />
-              <TabButton id="history" label="History" icon={Clock} />
+              <TabButton 
+                id="notes" 
+                label="Comments" 
+                icon={MessageSquare} 
+                count={task.comments?.length || 0} 
+              />
+              <TabButton 
+                id="history" 
+                label="History" 
+                icon={Clock} 
+                count={task.history?.length || 0} 
+              />
             </div>
           </div>
 
@@ -252,6 +389,7 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
                       onChange={e => setEditedTask({...editedTask, description: e.target.value})}
                       className="w-full px-3 py-2 border rounded-lg text-slate-600"
                       rows={4}
+                      disabled={isSubmitting}
                     />
                   ) : (
                     <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
@@ -269,29 +407,36 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
 
             {activeTab === 'notes' && (
               <div className="p-6 space-y-6">
-                {/* Notes Input */}
+                {/* Comment Input */}
                 <div className="space-y-3">
                   <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add your notes here..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Add your comment here..."
                     className="w-full px-3 py-2 border rounded-lg text-slate-600 min-h-[100px]"
+                    disabled={isSubmitting}
                   />
                   <button
-                    onClick={handleNotesSubmit}
+                    onClick={handleCommentSubmit}
+                    disabled={isSubmitting || !comment.trim()}
                     className="px-4 py-2 text-sm font-medium text-white 
                       bg-blue-600 hover:bg-blue-700 rounded-lg 
-                      transition-colors duration-200"
+                      transition-colors duration-200
+                      disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Add Note
+                    {isSubmitting ? 'Adding...' : 'Add Comment'}
                   </button>
                 </div>
 
-                {/* Notes List */}
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                  {taskNotes.map((note, index) => (
-                    <NoteItem key={index} note={note} />
+                {/* Comments List */}
+                <div className="space-y-4 max-h-[400px] overflow-y-auto comments-container">
+                  {sortedComments.map((comment) => (
+                    <CommentItem key={comment.id} comment={comment} />
                   ))}
+                  {(!task.comments || task.comments.length === 0) && (
+                    <p className="text-center text-slate-500">No comments yet</p>
+                  )}
+                  <div ref={commentsEndRef} /> {/* Scroll anchor */}
                 </div>
               </div>
             )}
@@ -299,9 +444,12 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
             {activeTab === 'history' && (
               <div className="p-6">
                 <div className="space-y-4 max-h-[500px] overflow-y-auto">
-                  {taskHistory.map((event, index) => (
-                    <HistoryItem key={index} event={event} />
+                  {sortedHistory.map((event) => (
+                    <HistoryItem key={event.id} event={event} />
                   ))}
+                  {(!task.history || task.history.length === 0) && (
+                    <p className="text-center text-slate-500">No history available</p>
+                  )}
                 </div>
               </div>
             )}
@@ -313,15 +461,18 @@ const TaskDetailModal = ({ isOpen, onClose, task }) => {
               {isEditing && (
                 <button
                   onClick={handleSaveChanges}
+                  disabled={isSubmitting}
                   className="px-4 py-2 text-sm font-medium text-white 
                     bg-blue-600 hover:bg-blue-700 
-                    rounded-lg transition-colors duration-200"
+                    rounded-lg transition-colors duration-200
+                    disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Save Changes
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
               )}
               <button
                 onClick={onClose}
+                disabled={isSubmitting}
                 className="px-4 py-2 text-sm font-medium text-slate-600 
                   bg-white hover:bg-slate-50 
                   border border-slate-200 rounded-lg 
