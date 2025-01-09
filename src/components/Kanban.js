@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo } from "react";
-import { Plus, Loader} from "lucide-react";
+import { Plus, Loader } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TaskModal from "./modals/TaskModal";
@@ -14,26 +14,15 @@ import { authService } from "../firebase/auth";
 
 const ProjectHeader = memo(({ project }) => (
   <div>
-    <h1 className="text-2xl font-semibold text-slate-800">
-      {project.title}
-    </h1>
-    <p className="text-sm text-slate-500 mt-1">
-      {project.description}
-    </p>
+    <h1 className="text-2xl font-semibold text-slate-800">{project.title}</h1>
+    <p className="text-sm text-slate-500 mt-1">{project.description}</p>
   </div>
 ));
 
 ProjectHeader.displayName = "ProjectHeader";
 
 const TaskColumn = memo(
-  ({
-    title,
-    tasks = [],
-    columnId,
-    projectId,
-    onDeleteTask,
-    onTaskSelect,
-  }) => {
+  ({ title, tasks = [], columnId, projectId, onDeleteTask, onTaskSelect }) => {
     const [isOver, setIsOver] = useState(false);
 
     const handleDragOver = useCallback((e) => {
@@ -57,12 +46,24 @@ const TaskColumn = memo(
 
           if (sourceColumnId !== columnId) {
             const currentUser = authService.getCurrentUser();
-            await taskService.updateTaskStatus(taskId, columnId, currentUser?.uid);
-            
-            if (columnId === 'done') {
-              await projectsService.updateProjectMetrics(projectId, 'STATUS_CHANGE', 'done');
-            } else if (sourceColumnId === 'done') {
-              await projectsService.updateProjectMetrics(projectId, 'STATUS_CHANGE', 'from_done');
+            await taskService.updateTaskStatus(
+              taskId,
+              columnId,
+              currentUser?.uid
+            );
+
+            if (columnId === "done") {
+              await projectsService.updateProjectMetrics(
+                projectId,
+                "STATUS_CHANGE",
+                "done"
+              );
+            } else if (sourceColumnId === "done") {
+              await projectsService.updateProjectMetrics(
+                projectId,
+                "STATUS_CHANGE",
+                "from_done"
+              );
             }
           }
         } catch (err) {
@@ -83,8 +84,10 @@ const TaskColumn = memo(
         <div className="px-6 py-4 border-b border-slate-100">
           <div className="flex items-center justify-between">
             <h2 className="font-medium text-slate-800">{title}</h2>
-            <span className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 
-              px-2.5 py-1 rounded-lg text-sm font-medium">
+            <span
+              className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 
+              px-2.5 py-1 rounded-lg text-sm font-medium"
+            >
               {tasks.length}
             </span>
           </div>
@@ -120,67 +123,80 @@ const Kanban = ({ viewType }) => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { 
-    tasks, 
-    loading, 
-    error, 
-    currentProjectId, 
-    project 
-  } = useTasks(projectId, viewType === "my-tasks" ? userData?.uid : null);
+  const { tasks, loading, error, currentProjectId, project } = useTasks(
+    projectId,
+    viewType === "my-tasks" ? userData?.uid : null
+  );
 
   const handleTaskSelect = useCallback((task) => {
     setSelectedTask(task);
     setIsDetailModalOpen(true);
   }, []);
 
-  const handleUpdateTask = useCallback(async (taskId, updates) => {
-    if (!currentUser?.uid) return;
-    try {
-      setIsLoading(true);
-      await taskService.updateTask(taskId, updates, currentUser.uid);
-    } catch (error) {
-      console.error("Failed to update task:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser?.uid]);
+  const handleUpdateTask = useCallback(
+    async (taskId, updates) => {
+      if (!currentUser?.uid) return;
+      try {
+        setIsLoading(true);
+        await taskService.updateTask(taskId, updates, currentUser.uid);
+      } catch (error) {
+        console.error("Failed to update task:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser?.uid]
+  );
 
-  const handleAddComment = useCallback(async (taskId, commentData) => {
-    if (!currentUser?.uid) return;
-    try {
-      setIsLoading(true);
-      await taskService.addComment(taskId, commentData, currentUser.uid);
-    } catch (error) {
-      console.error("Failed to add comment:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser?.uid]);
+  const handleAddComment = useCallback(
+    async (taskId, commentData) => {
+      if (!currentUser?.uid) return;
+      try {
+        setIsLoading(true);
+        await taskService.addComment(taskId, commentData, currentUser.uid);
+      } catch (error) {
+        console.error("Failed to add comment:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser?.uid]
+  );
 
-  const handleStatusChange = useCallback(async (taskId, newStatus) => {
-    if (!currentUser?.uid) return;
-    try {
-      setIsLoading(true);
-      await taskService.updateTaskStatus(taskId, newStatus, currentUser.uid);
-    } catch (error) {
-      console.error("Failed to update status:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser?.uid]);
+  const handleStatusChange = useCallback(
+    async (taskId, newStatus) => {
+      if (!currentUser?.uid) return;
+      try {
+        setIsLoading(true);
+        await taskService.updateTaskStatus(taskId, newStatus, currentUser.uid);
+      } catch (error) {
+        console.error("Failed to update status:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser?.uid]
+  );
 
-  const handleDeleteTask = useCallback(async (taskId, currentStatus) => {
-    if (!currentUser?.uid) return;
-    try {
-      setIsLoading(true);
-      await taskService.deleteTask(taskId, currentUser.uid);
-      await projectsService.updateProjectMetrics(projectId, 'DELETE_TASK', currentStatus);
-    } catch (error) {
-      console.error("Failed to delete task:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [projectId, currentUser?.uid]);
+  const handleDeleteTask = useCallback(
+    async (taskId, currentStatus) => {
+      if (!currentUser?.uid) return;
+      try {
+        setIsLoading(true);
+        await taskService.deleteTask(taskId, currentUser.uid);
+        await projectsService.updateProjectMetrics(
+          projectId,
+          "DELETE_TASK",
+          currentStatus
+        );
+      } catch (error) {
+        console.error("Failed to delete task:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [projectId, currentUser?.uid]
+  );
 
   const handleDetailModalClose = useCallback(() => {
     setIsDetailModalOpen(false);
@@ -283,15 +299,13 @@ const Kanban = ({ viewType }) => {
           projectId={projectId}
         />
 
-        {/* Task Detail Modal */}
         <TaskDetailModal
           isOpen={isDetailModalOpen}
           onClose={handleDetailModalClose}
-          task={selectedTask}
+          taskId={selectedTask?.id} // Changed from passing full task object
           onTaskUpdate={handleUpdateTask}
           onNoteAdd={handleAddComment}
           onStatusChange={handleStatusChange}
-          isLoading={isLoading}
         />
       </div>
     </div>

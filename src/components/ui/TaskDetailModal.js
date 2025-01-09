@@ -1,39 +1,46 @@
-// src/components/ui/TaskDetailModal.jsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Calendar, X, Edit2, Clock, Check, MessageSquare, AlertCircle, Loader } from 'lucide-react';
 import { useUserDetails } from '../../hooks/useUserDetails';
+
 import { authService } from '../../firebase/auth';
 import Avatar from './Avatar';
+import useTaskDetails from '../../hooks/useTaskDetail';
 
 const TaskDetailModal = ({ 
   isOpen, 
   onClose, 
-  task,
+  taskId,
   onTaskUpdate,
   onNoteAdd,
-  onStatusChange,
-  isLoading = false
+  onStatusChange
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [editedTask, setEditedTask] = useState(task);
+  const [editedTask, setEditedTask] = useState(null);
   const [comment, setComment] = useState('');
   const [activeTab, setActiveTab] = useState('details');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { users: assigneeUsers, loading: loadingAssignees } = useUserDetails(task?.assignees || []);
+  const { taskDetails, loading, error } = useTaskDetails(taskId);
+  const { users: assigneeUsers, loading: loadingAssignees } = useUserDetails(taskDetails?.assignees || []);
   const currentUser = authService.getCurrentUser();
   const commentsEndRef = useRef(null);
 
+
+   // Get comments from either notes or comments array
+   const getComments = useCallback(() => {
+    return taskDetails?.comments || taskDetails?.notes || [];
+  }, [taskDetails]);
+
   // Reset states when task changes
   useEffect(() => {
-    if (task) {
-      setEditedTask(task);
+    if (taskDetails) {
+      setEditedTask(taskDetails);
       // Scroll to bottom if new comment added
       if (activeTab === 'notes' && 
-          task.comments?.length > (editedTask?.comments?.length || 0)) {
+          getComments().length > (editedTask?.comments?.length || editedTask?.notes?.length || 0)) {
         scrollToBottom();
       }
     }
-  }, [task, activeTab]);
+  }, [taskDetails, activeTab, getComments]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -54,16 +61,16 @@ const TaskDetailModal = ({
   };
 
   const handleStatusChange = useCallback(async (newStatus) => {
-    if (!task?.id || !currentUser) return;
+    if (!taskId || !currentUser) return;
     try {
       setIsSubmitting(true);
-      await onStatusChange(task.id, newStatus);
+      await onStatusChange(taskId, newStatus);
     } catch (error) {
       console.error('Failed to update status:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [task?.id, currentUser, onStatusChange]);
+  }, [taskId, currentUser, onStatusChange]);
 
   // Components
   const AssigneesSection = () => {
@@ -94,6 +101,45 @@ const TaskDetailModal = ({
         ))}
       </div>
     );
+  };
+
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return '';
+    
+    const formatOptions = {
+      date: { year: 'numeric', month: 'short', day: 'numeric' },
+      time: { hour: '2-digit', minute: '2-digit' }
+    };
+
+    let date;
+    // Handle Firestore Timestamp
+    if (timestamp.seconds) {
+      date = new Date(timestamp.seconds * 1000);
+    }
+    // Handle JavaScript Date
+    else if (timestamp instanceof Date) {
+      date = timestamp;
+    }
+    // Handle string date
+    else {
+      date = new Date(timestamp);
+    }
+
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let dateStr;
+    if (date.toDateString() === today.toDateString()) {
+      dateStr = 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      dateStr = 'Yesterday';
+    } else {
+      dateStr = date.toLocaleDateString(undefined, formatOptions.date);
+    }
+
+    const timeStr = date.toLocaleTimeString(undefined, formatOptions.time);
+    return `${dateStr} at ${timeStr}`;
   };
 
   const CommentItem = ({ comment }) => {
@@ -128,7 +174,7 @@ const TaskDetailModal = ({
               {user?.name || 'Unknown User'}
             </span>
             <span className="text-xs text-slate-500 ml-2">
-              {comment.createdAt?.toDate().toLocaleString()}
+              {formatDateTime(comment.createdAt)}
             </span>
           </div>
         </div>
@@ -171,7 +217,7 @@ const TaskDetailModal = ({
               {user?.name || 'Unknown User'}
             </span>
             <span className="text-xs text-slate-500">
-              {event.createdAt?.toDate().toLocaleString()}
+              {formatDateTime(event.createdAt)}
             </span>
           </div>
           <p className="text-sm text-slate-600">{event.description}</p>
@@ -180,6 +226,8 @@ const TaskDetailModal = ({
     );
   };
 
+ 
+  // Updated TabButton for comments count
   const TabButton = ({ id, label, icon: Icon, count }) => (
     <button
       onClick={() => setActiveTab(id)}
@@ -216,11 +264,11 @@ const TaskDetailModal = ({
   }, [isOpen, onClose]);
 
   const handleCommentSubmit = async () => {
-    if (!comment.trim() || isSubmitting || !currentUser?.uid || !task?.id) return;
+    if (!comment.trim() || isSubmitting || !currentUser?.uid || !taskId) return;
 
     try {
       setIsSubmitting(true);
-      await onNoteAdd(task.id, {
+      await onNoteAdd(taskId, {
         content: comment.trim(),
       });
       setComment('');
@@ -233,11 +281,11 @@ const TaskDetailModal = ({
   };
 
   const handleSaveChanges = async () => {
-    if (isSubmitting || !currentUser?.uid || !task?.id) return;
+    if (isSubmitting || !currentUser?.uid || !taskId) return;
 
     try {
       setIsSubmitting(true);
-      await onTaskUpdate(task.id, {
+      await onTaskUpdate(taskId, {
         title: editedTask.title,
         description: editedTask.description,
         priority: editedTask.priority,
@@ -251,9 +299,9 @@ const TaskDetailModal = ({
     }
   };
 
-  if (!isOpen || !task) return null;
+  if (!isOpen || !taskId) return null;
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-25">
         <div className="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-4">
@@ -264,14 +312,15 @@ const TaskDetailModal = ({
     );
   }
 
-  // Sort comments and history by date
-  const sortedComments = task.comments?.slice().sort((a, b) => 
-    b.createdAt?.toDate().getTime() - a.createdAt?.toDate().getTime()
-  ) || [];
-
-  const sortedHistory = task.history?.slice().sort((a, b) => 
-    b.createdAt?.toDate().getTime() - a.createdAt?.toDate().getTime()
-  ) || [];
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-25">
+        <div className="bg-white p-6 rounded-lg shadow-xl text-red-500">
+          Error loading task: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -291,12 +340,12 @@ const TaskDetailModal = ({
               {isEditing ? (
                 <input
                   type="text"
-                  value={editedTask.title}
+                  value={editedTask?.title || ''}
                   onChange={e => setEditedTask({...editedTask, title: e.target.value})}
                   className="text-xl font-semibold text-slate-800 w-full px-2 py-1 border rounded"
                 />
               ) : (
-                <h2 className="text-xl font-semibold text-slate-800">{task.title}</h2>
+                <h2 className="text-xl font-semibold text-slate-800">{taskDetails?.title || 'Untitled Task'}</h2>
               )}
               <div className="flex items-center gap-2">
                 <button
@@ -319,7 +368,7 @@ const TaskDetailModal = ({
             <div className="flex items-center gap-3">
               {isEditing ? (
                 <select
-                  value={editedTask.priority}
+                  value={editedTask?.priority || 'medium'}
                   onChange={e => setEditedTask({...editedTask, priority: e.target.value})}
                   className="text-sm px-3 py-1.5 rounded-md border"
                   disabled={isSubmitting}
@@ -330,14 +379,14 @@ const TaskDetailModal = ({
                 </select>
               ) : (
                 <span className={`text-sm font-semibold px-3 py-1.5 rounded-md inline-flex items-center
-                  ring-1 ring-inset ${priorityStyles[task.priority]} shadow-sm`}
+                  ring-1 ring-inset ${priorityStyles[taskDetails?.priority || 'medium']} shadow-sm`}
                 >
-                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                  {(taskDetails?.priority || 'medium').charAt(0).toUpperCase() + (taskDetails?.priority || 'medium').slice(1)} Priority
                 </span>
               )}
 
               <select
-                value={task.status}
+                value={taskDetails?.status || 'todo'}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 className="text-sm px-3 py-1.5 rounded-md border"
                 disabled={isSubmitting}
@@ -347,12 +396,12 @@ const TaskDetailModal = ({
                 <option value="done">Done</option>
               </select>
 
-              {task.dueDate && (
+              {taskDetails?.dueDate && (
                 <span className="flex items-center text-sm text-slate-500 bg-slate-50/80 
                   px-3 py-1.5 rounded-md ring-1 ring-inset ring-slate-200/60 shadow-sm"
                 >
                   <Calendar className="w-4 h-4 mr-2" />
-                  Due: {task.dueDate}
+                  Due: {taskDetails.dueDate}
                 </span>
               )}
             </div>
@@ -366,13 +415,13 @@ const TaskDetailModal = ({
                 id="notes" 
                 label="Comments" 
                 icon={MessageSquare} 
-                count={task.comments?.length || 0} 
+                count={getComments().length} 
               />
               <TabButton 
                 id="history" 
                 label="History" 
                 icon={Clock} 
-                count={task.history?.length || 0} 
+                count={taskDetails?.history?.length || 0} 
               />
             </div>
           </div>
@@ -393,7 +442,7 @@ const TaskDetailModal = ({
                     />
                   ) : (
                     <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
-                      {task.description}
+                      {taskDetails?.description || 'No description provided'}
                     </p>
                   )}
                 </div>
@@ -430,10 +479,10 @@ const TaskDetailModal = ({
 
                 {/* Comments List */}
                 <div className="space-y-4 max-h-[400px] overflow-y-auto comments-container">
-                  {sortedComments.map((comment) => (
+                  {getComments().map((comment) => (
                     <CommentItem key={comment.id} comment={comment} />
                   ))}
-                  {(!task.comments || task.comments.length === 0) && (
+                  {getComments().length === 0 && (
                     <p className="text-center text-slate-500">No comments yet</p>
                   )}
                   <div ref={commentsEndRef} /> {/* Scroll anchor */}
@@ -444,10 +493,10 @@ const TaskDetailModal = ({
             {activeTab === 'history' && (
               <div className="p-6">
                 <div className="space-y-4 max-h-[500px] overflow-y-auto">
-                  {sortedHistory.map((event) => (
+                  {taskDetails?.history?.map((event) => (
                     <HistoryItem key={event.id} event={event} />
                   ))}
-                  {(!task.history || task.history.length === 0) && (
+                  {(!taskDetails?.history || taskDetails.history.length === 0) && (
                     <p className="text-center text-slate-500">No history available</p>
                   )}
                 </div>
