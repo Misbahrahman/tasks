@@ -1,9 +1,9 @@
-// src/hooks/useTasks.js
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { authService } from '../firebase/auth';
 
-export const useTasks = (projectId, userId = null) => {
+export const useTasks = (projectId, viewType = null) => {
   const [tasks, setTasks] = useState({
     todo: [],
     inProgress: [],
@@ -22,9 +22,6 @@ export const useTasks = (projectId, userId = null) => {
 
     const fetchProject = async () => {
       try {
-        // console.log('Fetching project with ID:', projectId);
-        
-        // Try to find project by numeric ID field
         const projectsRef = collection(db, 'projects');
         const q = query(projectsRef);
         const querySnapshot = await getDocs(q);
@@ -43,7 +40,6 @@ export const useTasks = (projectId, userId = null) => {
         });
 
         if (foundProject) {
-          // console.log('Found project:', foundProject);
           setProject(foundProject);
           setError(null);
         } else {
@@ -55,8 +51,6 @@ export const useTasks = (projectId, userId = null) => {
         console.error('Error fetching project:', error);
         setError(error.message);
         setProject(null);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -73,18 +67,20 @@ export const useTasks = (projectId, userId = null) => {
     const tasksRef = collection(db, 'tasks');
     let q;
 
-    if (userId) {
-      // Fetch user-specific tasks
+    const currentUser = authService.getCurrentUser();
+    
+    if (viewType === 'my-tasks') {
+      // For my-tasks view, we'll filter by both project and current user in assignees
       q = query(
         tasksRef,
-        where('projectId', '==', projectId), // Use the Firestore document ID
-        where('assignees', 'array-contains', userId)
+        where('projectId', '==', projectId),
+        where('assignees', 'array-contains', currentUser?.uid) // Using first team member as current user
       );
     } else {
-      // Fetch all project tasks
+      // For all tasks view, only filter by project
       q = query(
         tasksRef,
-        where('projectId', '==', projectId) // Use the Firestore document ID
+        where('projectId', '==', projectId)
       );
     }
 
@@ -106,8 +102,25 @@ export const useTasks = (projectId, userId = null) => {
           };
 
           if (tasksByStatus[task.status]) {
+            // Sort tasks by priority and due date
             tasksByStatus[task.status].push(task);
           }
+        });
+
+        // Sort tasks in each status category
+        Object.keys(tasksByStatus).forEach(status => {
+          tasksByStatus[status].sort((a, b) => {
+            // First sort by priority
+            const priorityOrder = { high: 0, medium: 1, low: 2 };
+            const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+            
+            if (priorityDiff !== 0) return priorityDiff;
+            
+            // Then by due date if priority is the same
+            const dateA = new Date(a.dueDate);
+            const dateB = new Date(b.dueDate);
+            return dateA - dateB;
+          });
         });
 
         setTasks(tasksByStatus);
@@ -121,7 +134,7 @@ export const useTasks = (projectId, userId = null) => {
     );
 
     return () => unsubscribe();
-  }, [projectId, userId, project]);
+  }, [projectId, project, viewType]);
 
   return {
     tasks,

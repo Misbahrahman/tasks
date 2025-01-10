@@ -125,7 +125,7 @@ const Kanban = ({ viewType }) => {
 
   const { tasks, loading, error, currentProjectId, project } = useTasks(
     projectId,
-    viewType === "my-tasks" ? userData?.uid : null
+    viewType
   );
 
   const handleTaskSelect = useCallback((task) => {
