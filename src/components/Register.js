@@ -15,6 +15,10 @@ const RegisterPage = () => {
   });
 
   const roles = [
+    'Manager',
+    'Project manager',
+    'Admin',
+    'Volunteer',
     'Team Member'
   ];
   const [error, setError] = useState('');
