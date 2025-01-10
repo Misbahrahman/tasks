@@ -1,7 +1,13 @@
-// src/components/AssigneeSelect.jsx
 import React from 'react';
-import { Avatar } from './Avatar';
+import { Avatar, AVATAR_COLOR_MAP } from './Avatar';
 import { useUsers } from '../../hooks/useUser';
+
+// Helper function to generate consistent avatar colors
+const getAvatarColor = (name = '') => {
+  const colors = Object.keys(AVATAR_COLOR_MAP);
+  const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+  return colors[index];
+};
 
 const AssigneeSelect = ({
   label,
@@ -48,31 +54,40 @@ const AssigneeSelect = ({
         </label>
       )}
       <div className={`border border-slate-200 rounded-lg divide-y divide-slate-100 ${className}`}>
-        {users.map((user) => (
-          <label 
-            key={user.id}
-            className="flex items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
-          >
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-              checked={selectedAssignees.includes(user.id)}
-              onChange={() => handleAssigneeChange(user.id)}
-            />
-            <div className="ml-3 flex items-center space-x-3">
-              <Avatar 
-                initials={user.initials || user.name.charAt(0)}
-                gradientFrom="blue-500"
-                gradientTo="blue-600"
-                size="sm"
+        {users.map((user) => {
+          const initials = user.name
+            .split(' ')
+            .map(part => part[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+
+          return (
+            <label
+              key={user.id}
+              className="flex items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                checked={selectedAssignees.includes(user.id)}
+                onChange={() => handleAssigneeChange(user.id)}
               />
-              <div>
-                <div className="font-medium text-slate-700">{user.name}</div>
-                <div className="text-sm text-slate-500">{user.role}</div>
+              <div className="ml-3 flex items-center space-x-3">
+                <Avatar
+                  initials={initials}
+                  avatarColor={user.avatarColor || getAvatarColor(user.name)}
+                  name={user.name}
+                  size="sm"
+                />
+                <div>
+                  <div className="font-medium text-slate-700">{user.name}</div>
+                  <div className="text-sm text-slate-500">{user.role}</div>
+                </div>
               </div>
-            </div>
-          </label>
-        ))}
+            </label>
+          );
+        })}
       </div>
     </div>
   );
@@ -86,7 +101,7 @@ export const SelectedAssignees = ({ assignees = [] }) => {
     return (
       <div className="flex -space-x-2">
         {[1, 2].map((n) => (
-          <div 
+          <div
             key={n}
             className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white"
           />
@@ -100,15 +115,22 @@ export const SelectedAssignees = ({ assignees = [] }) => {
       {assignees.map((userId) => {
         const user = users.find(u => u.id === userId);
         if (!user) return null;
-        
+
+        const initials = user.name
+          .split(' ')
+          .map(part => part[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2);
+
         return (
           <Avatar
             key={userId}
-            initials={user.initials || user.name.charAt(0)}
-            gradientFrom="blue-500"
-            gradientTo="blue-600"
-            className="border-2 border-white hover:scale-110 hover:z-10 transition-transform duration-300"
+            initials={initials}
+            avatarColor={user.avatarColor || getAvatarColor(user.name)}
+            name={user.name}
             size="sm"
+            className="hover:z-10"
           />
         );
       })}

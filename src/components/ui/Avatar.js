@@ -1,4 +1,3 @@
-// src/components/ui/Avatar.jsx
 import React from 'react';
 
 export const AVATAR_COLOR_MAP = {
@@ -36,7 +35,8 @@ export const Avatar = ({
   initials, 
   avatarColor = 'blue',
   size = 'md',
-  className = '' 
+  className = '',
+  name  // Add name prop
 }) => {
   const sizeClasses = {
     sm: 'w-7 h-7 text-xs',
@@ -47,26 +47,39 @@ export const Avatar = ({
   const colorConfig = AVATAR_COLOR_MAP[avatarColor] || AVATAR_COLOR_MAP.blue;
 
   return (
-    <div 
-      className={`
-        ${sizeClasses[size]} 
-        rounded-full 
-        border-2 
-        border-white 
-        flex 
-        items-center 
-        justify-center 
-        font-medium 
-        text-white 
-        shadow-sm 
-        bg-gradient-to-br 
-        ${colorConfig.fromColor} 
-        ${colorConfig.toColor}
-        ${className}
-      `}
-      title={initials}
-    >
-      {initials}
+    <div className="group relative">
+      <div 
+        className={`
+          ${sizeClasses[size]} 
+          rounded-full 
+          border-2 
+          border-white 
+          flex 
+          items-center 
+          justify-center 
+          font-medium 
+          text-white 
+          shadow-sm 
+          bg-gradient-to-br 
+          ${colorConfig.fromColor} 
+          ${colorConfig.toColor}
+          ${className}
+        `}
+      >
+        {initials}
+      </div>
+      
+      {/* Tooltip */}
+      {name && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 
+          text-xs font-medium text-white bg-gray-900 rounded-md opacity-0 invisible
+          group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap">
+          {name}
+          {/* Tooltip Arrow */}
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1 
+            border-4 border-transparent border-t-gray-900" />
+        </div>
+      )}
     </div>
   );
 };
@@ -83,14 +96,25 @@ export const AvatarGroup = ({ users = [], max = 3 }) => {
           initials={user.initials}
           avatarColor={user.avatarColor}
           size="sm"
+          name={user.name}  // Pass name to Avatar
           className="hover:z-10 transition-transform hover:scale-110"
         />
       ))}
       {remaining > 0 && (
-        <div className="w-7 h-7 flex items-center justify-center text-xs font-medium 
-          text-white bg-gray-400 rounded-full border-2 border-white 
-          hover:z-10 transition-transform hover:scale-110">
-          +{remaining}
+        <div className="group relative">
+          <div className="w-7 h-7 flex items-center justify-center text-xs font-medium 
+            text-white bg-gray-400 rounded-full border-2 border-white 
+            hover:z-10 transition-transform hover:scale-110">
+            +{remaining}
+          </div>
+          {/* Tooltip for remaining count */}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 
+            text-xs font-medium text-white bg-gray-900 rounded-md opacity-0 invisible
+            group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap">
+            {remaining} more {remaining === 1 ? 'user' : 'users'}
+            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1 
+              border-4 border-transparent border-t-gray-900" />
+          </div>
         </div>
       )}
     </div>

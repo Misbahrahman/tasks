@@ -101,7 +101,7 @@ const TaskCard = ({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      className={`group p-5 rounded-xl border transition-all duration-300 ease-in-out cursor-pointer
+      className={`p-5 rounded-xl border transition-all duration-300 ease-in-out cursor-pointer
         ${isOverdue() 
           ? "border-rose-200 bg-gradient-to-br from-rose-50 to-white hover:shadow-rose-100/60 hover:border-rose-300" 
           : "border-slate-100 bg-white hover:shadow-slate-200/60 hover:border-slate-200"}
