@@ -11,6 +11,8 @@ import { taskService } from "../firebase/taskService";
 import { useUser } from "../hooks/useUser";
 import projectsService from "../firebase/projectsService";
 import { authService } from "../firebase/auth";
+import FilterDropdown from "./ui/DropdownFilter";
+import useProjects from "../hooks/useProjects";
 
 const ProjectHeader = memo(({ project }) => (
   <div>
@@ -116,17 +118,21 @@ const Kanban = ({ viewType }) => {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const { userData } = useUser();
+  const { projects, projectsLoading, projectsError } = useProjects();
   const currentUser = authService.getCurrentUser();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedProjectId , setSelectedProjectId] = useState(projectId);
 
   const { tasks, loading, error, currentProjectId, project } = useTasks(
-    projectId,
+    selectedProjectId,
     viewType
   );
+
+  
 
   const handleTaskSelect = useCallback((task) => {
     setSelectedTask(task);
@@ -147,6 +153,10 @@ const Kanban = ({ viewType }) => {
     },
     [currentUser?.uid]
   );
+
+  const handleProjectChange = (changedProject)  => {
+    setSelectedProjectId(changedProject);
+  }
 
   const handleAddComment = useCallback(
     async (taskId, commentData) => {
@@ -185,7 +195,7 @@ const Kanban = ({ viewType }) => {
         setIsLoading(true);
         await taskService.deleteTask(taskId, currentUser.uid);
         await projectsService.updateProjectMetrics(
-          projectId,
+          selectedProjectId,
           "DELETE_TASK",
           currentStatus
         );
@@ -195,7 +205,7 @@ const Kanban = ({ viewType }) => {
         setIsLoading(false);
       }
     },
-    [projectId, currentUser?.uid]
+    [selectedProjectId, currentUser?.uid]
   );
 
   const handleDetailModalClose = useCallback(() => {
@@ -259,15 +269,21 @@ const Kanban = ({ viewType }) => {
               </>
             )}
           </div>
-
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 
-              text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Task
-          </button>
+          {/* Top-right controls */}
+          <div className="flex items-center space-x-4">
+            <FilterDropdown
+              text = {project ? project.title : "Project"}
+              elements={[{name : "All Projects" , id : 0} , ...projects]}
+              onChange={handleProjectChange}
+            />
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
+            </button>
+          </div>
         </Header>
 
         <main className="flex-1 p-8 overflow-auto">
@@ -277,17 +293,17 @@ const Kanban = ({ viewType }) => {
                 key={status}
                 title={
                   status === "todo"
-                    ? "To Do"
-                    : status === "inProgress"
-                    ? "In Progress"
+                      ? "To Do"
+                      : status === "inProgress"
+                      ? "In Progress"
                     : "Done"
                 }
                 tasks={tasks[status]}
-                columnId={status}
-                projectId={projectId}
+                        columnId={status}
+                projectId={selectedProjectId}
                 onDeleteTask={handleDeleteTask}
                 onTaskSelect={handleTaskSelect}
-              />
+                      />
             ))}
           </div>
         </main>
@@ -296,7 +312,7 @@ const Kanban = ({ viewType }) => {
         <TaskModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
-          projectId={projectId}
+          projectId={selectedProjectId}
         />
 
         <TaskDetailModal

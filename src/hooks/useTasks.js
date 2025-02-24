@@ -13,7 +13,7 @@ export const useTasks = (projectId, viewType = null) => {
   const [error, setError] = useState(null);
   const [project, setProject] = useState(null);
 
-  // Fetch project details
+  // Fetch tasks
   useEffect(() => {
     if (!projectId) {
       setLoading(false);
@@ -54,7 +54,12 @@ export const useTasks = (projectId, viewType = null) => {
       }
     };
 
-    fetchProject();
+    if(projectId == 0){
+      setProject({title : "All Tasks" , id : 0})
+    }
+    else{
+      fetchProject();
+    }
   }, [projectId]);
 
   // Fetch tasks
@@ -68,20 +73,34 @@ export const useTasks = (projectId, viewType = null) => {
     let q;
 
     const currentUser = authService.getCurrentUser();
-    
     if (viewType === 'my-tasks') {
       // For my-tasks view, we'll filter by both project and current user in assignees
-      q = query(
-        tasksRef,
-        where('projectId', '==', projectId),
-        where('assignees', 'array-contains', currentUser?.uid) // Using first team member as current user
-      );
+      if(projectId == 0){
+        q = query(
+          tasksRef,
+          where('assignees', 'array-contains', currentUser?.uid) // Using first team member as current user
+        );
+      }else{
+        q = query(
+          tasksRef,
+          where('projectId', '==', projectId),
+          where('assignees', 'array-contains', currentUser?.uid) // Using first team member as current user
+        );
+      }
+      
     } else {
       // For all tasks view, only filter by project
-      q = query(
-        tasksRef,
-        where('projectId', '==', projectId)
-      );
+      if(projectId == 0){
+        q = query(
+          tasksRef,
+        )
+      }else{
+        q = query(
+          tasksRef,
+          where('projectId', '==', projectId)
+        );
+      }
+      
     }
 
     const unsubscribe = onSnapshot(
