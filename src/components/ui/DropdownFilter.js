@@ -1,17 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
-const FilterDropdown = ({ elements = [], onChange }) => {
-  const [selectedElement, setSelectedElement] = useState("");
-  const [filteredElements, setFilteredElements] = useState([]);
+const FilterDropdown = ({ elements = [], onChange, selectedValue }) => {
+  const [selectedElement, setSelectedElement] = useState(selectedValue || "");
 
   useEffect(() => {
-    const filterInactiveProjectsAndUsers = () => {
-      return elements.filter((element) => !element.status || element.status === "active");
-    };
-
-    setFilteredElements(filterInactiveProjectsAndUsers());
-  }, [elements]);
+    setSelectedElement(selectedValue);
+  }, [selectedValue]); // Update if prop changes
 
   const handleChange = (e) => {
     const value = e.target.value;
@@ -30,7 +25,7 @@ const FilterDropdown = ({ elements = [], onChange }) => {
                      placeholder-slate-400 focus:outline-none focus:ring-2 
                      focus:ring-blue-500 focus:border-transparent appearance-none"
         >
-          {filteredElements.map((element) => (
+          {elements.map((element) => (
             <option key={element.id} value={element.id}>
               {element.name || element.title}
             </option>
@@ -41,5 +36,6 @@ const FilterDropdown = ({ elements = [], onChange }) => {
     </div>
   );
 };
+
 
 export default FilterDropdown;

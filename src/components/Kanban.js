@@ -8,7 +8,7 @@ import TaskCard from "./ui/TaskCard";
 import TaskDetailModal from "./ui/TaskDetailModal";
 import { useTasks } from "../hooks/useTasks";
 import { taskService } from "../firebase/taskService";
-import { useUser } from "../hooks/useUser";
+import { useUser, useUsers } from "../hooks/useUser";
 import projectsService from "../firebase/projectsService";
 import { authService } from "../firebase/auth";
 import FilterDropdown from "./ui/DropdownFilter";
@@ -125,14 +125,18 @@ const Kanban = ({ viewType }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedProjectId , setSelectedProjectId] = useState(projectId);
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId);
+  const [selectedUserId, setSelectedUserId] = useState(currentUser?.id);
 
-  const { tasks, loading, error, currentProjectId, project } = useTasks(
-    selectedProjectId,
-    viewType
-  );
-
-  
+  const { users, loadingUsers, usersError } = useUsers();
+  const {
+    tasks,
+    loading,
+    error,
+    currentProjectId,
+    project,
+    userDetails: user,
+  } = useTasks(selectedProjectId, viewType, selectedUserId);
 
   const handleTaskSelect = useCallback((task) => {
     setSelectedTask(task);
@@ -154,9 +158,13 @@ const Kanban = ({ viewType }) => {
     [currentUser?.uid]
   );
 
-  const handleProjectChange = (changedProject)  => {
+  const handleProjectChange = (changedProject) => {
     setSelectedProjectId(changedProject);
-  }
+  };
+
+  const handleUserChange = (changedUser) => {
+    setSelectedUserId(changedUser);
+  };
 
   const handleAddComment = useCallback(
     async (taskId, commentData) => {
@@ -272,10 +280,21 @@ const Kanban = ({ viewType }) => {
           {/* Top-right controls */}
           <div className="flex items-center space-x-4">
             <FilterDropdown
-              text = {project ? project.title : "Project"}
-              elements={[{name : "All Projects" , id : 0} , ...projects]}
+              text={project ? project.title : "Select Project"}
+              elements={[{ name: "All Projects", id: 0 }, ...projects]}
               onChange={handleProjectChange}
+              selectedValue={selectedProjectId} // Ensure correct default selection
             />
+
+            {viewType === "all" && (
+              <FilterDropdown
+                text={user ? user.name : "Select User"}
+                elements={[{ name: "All Users", id: 0 }, ...users]}
+                onChange={handleUserChange}
+                selectedValue={selectedUserId} // Ensure correct default selection
+              />
+            )}
+
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
@@ -293,17 +312,17 @@ const Kanban = ({ viewType }) => {
                 key={status}
                 title={
                   status === "todo"
-                      ? "To Do"
-                      : status === "inProgress"
-                      ? "In Progress"
+                    ? "To Do"
+                    : status === "inProgress"
+                    ? "In Progress"
                     : "Done"
                 }
                 tasks={tasks[status]}
-                        columnId={status}
+                columnId={status}
                 projectId={selectedProjectId}
                 onDeleteTask={handleDeleteTask}
                 onTaskSelect={handleTaskSelect}
-                      />
+              />
             ))}
           </div>
         </main>
