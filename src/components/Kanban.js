@@ -127,7 +127,7 @@ TaskColumn.displayName = "TaskColumn";
 const Kanban = ({ viewType }) => {
   const navigate = useNavigate();
   const { projectId } = useParams();
-  const { userData, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const { projects } = useProjects();
   const currentUser = authService.getCurrentUser();
   const { modalState, showModal, hideModal } = useModal();
@@ -136,7 +136,7 @@ const Kanban = ({ viewType }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsLoading] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(projectId);
   const [selectedUserId, setSelectedUserId] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");

@@ -1,13 +1,12 @@
 // src/components/Login.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../firebase/auth';
 import { TextInput } from './ui/TextInput';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'passwordless'
+const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'passwordless'
   const [formData, setFormData] = useState({
     email: '',
     password: '',
