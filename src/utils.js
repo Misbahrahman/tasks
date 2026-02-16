@@ -1,9 +1,13 @@
-// src/utils.js
 export function cn(...classes) {
-    return classes.filter(Boolean).join(' ');
-  }
+  return classes.filter(Boolean).join(' ');
+}
 
 export const AVATAR_COLOR_MAP = {
+  blue: {
+    id: "blue",
+    label: "Ocean Blue",
+    bgClass: "bg-gradient-to-br from-blue-500 to-blue-600"
+  },
   teal: {
     id: "teal",
     label: "Serene Teal",
@@ -35,3 +39,16 @@ export const AVATAR_COLOR_MAP = {
     bgClass: "bg-gradient-to-br from-yellow-500 to-yellow-600"
   }
 };
+
+// Shared color keys used by Avatar component
+const AVATAR_COLOR_KEYS = ['blue', 'teal', 'cyan', 'indigo', 'fuchsia', 'lime', 'yellow'];
+
+/** Deterministic avatar color from a name string */
+export const getAvatarColor = (name = '') => {
+  const index = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % AVATAR_COLOR_KEYS.length;
+  return AVATAR_COLOR_KEYS[index];
+};
+
+/** Get 1-2 uppercase initials from a full name */
+export const getInitials = (name = '') =>
+  name.split(' ').map(w => w[0]).filter(Boolean).join('').toUpperCase().slice(0, 2) || '?';

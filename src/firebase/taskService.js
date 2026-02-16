@@ -1,180 +1,151 @@
-// src/firebase/taskService.js
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  arrayUnion,
-  getDoc,
-  Timestamp
+import {
+  collection, addDoc, updateDoc, deleteDoc,
+  doc, serverTimestamp, arrayUnion, getDoc, Timestamp
 } from 'firebase/firestore';
 import { db } from './config';
+import { metricsService } from './metricsService';
+
+// Generate a collision-safe ID for array sub-documents (history / comments)
+const newId = () => doc(collection(db, '_')).id;
 
 export const taskService = {
   createTask: async (projectId, taskData, userId) => {
-    try {
-      const docRef = await addDoc(collection(db, 'tasks'), {
-        ...taskData,
-        projectId,
+    const docRef = await addDoc(collection(db, 'tasks'), {
+      ...taskData,
+      projectId,
+      createdBy: userId,
+      status: 'todo',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      comments: [],
+      history: [{
+        id: newId(),
+        type: 'CREATED',
+        description: 'Task created',
         createdBy: userId,
-        status: 'todo',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        comments: [],
-        history: [{
-          id: Date.now().toString(),
-          type: 'CREATED',
-          description: 'Task created',
-          createdBy: userId,
-          createdAt: Timestamp.now()
-        }]
-      });
-      
-      return docRef.id;
-    } catch (error) {
-      throw new Error('Failed to create task: ' + error.message);
-    } 
+        createdAt: Timestamp.now(),
+      }],
+    });
+
+    // Recalculate metrics for all assignees
+    const assignees = taskData.assignees || [];
+    assignees.forEach((uid) => metricsService.calculateAndStoreMetrics(uid).catch(console.error));
+    if (userId && !assignees.includes(userId)) {
+      metricsService.calculateAndStoreMetrics(userId).catch(console.error);
+    }
+
+    return docRef.id;
   },
 
+  // Returns the previous status so callers can update project metrics correctly
   updateTaskStatus: async (taskId, newStatus, userId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const taskSnap = await getDoc(taskRef);
-      const oldStatus = taskSnap.data()?.status;
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+    const oldStatus = taskSnap.data()?.status;
 
-      await updateDoc(taskRef, {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-        history: arrayUnion({
-          id: Date.now().toString(),
-          type: 'STATUS_CHANGED',
-          description: `Status changed from ${oldStatus} to ${newStatus}`,
-          createdBy: userId,
-          createdAt: Timestamp.now()
-        })
-      });
-    } catch (error) {
-      throw new Error('Failed to update task status: ' + error.message);
-    }
+    await updateDoc(taskRef, {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+      history: arrayUnion({
+        id: newId(),
+        type: 'STATUS_CHANGED',
+        description: `Status changed from ${oldStatus} to ${newStatus}`,
+        createdBy: userId,
+        createdAt: Timestamp.now(),
+      }),
+    });
+
+    // Recalculate metrics for all assignees of this task
+    const assignees = taskSnap.data()?.assignees || [];
+    assignees.forEach((uid) => metricsService.calculateAndStoreMetrics(uid).catch(console.error));
+
+    return oldStatus;
   },
 
   updateTask: async (taskId, updates, userId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const taskSnap = await getDoc(taskRef);
-      const oldData = taskSnap.data();
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+    const oldData = taskSnap.data() || {};
 
-      // Create history entries for changed fields
-      const changes = [];
-      Object.keys(updates).forEach(field => {
-        if (oldData[field] !== updates[field]) {
-          changes.push(`${field}: ${oldData[field]} → ${updates[field]}`);
-        }
-      });
+    const changes = Object.keys(updates)
+      .filter((k) => String(oldData[k]) !== String(updates[k]))
+      .map((k) => `${k}: ${oldData[k]} → ${updates[k]}`);
 
-      if (changes.length > 0) {
-        await updateDoc(taskRef, {
-          ...updates,
-          updatedAt: serverTimestamp(),
-          history: arrayUnion({
-            id: Date.now().toString(),
-            type: 'UPDATED',
-            description: `Updated ${changes.join(', ')}`,
-            createdBy: userId,
-            createdAt: Timestamp.now()
-          })
-        });
-      } else {
-        await updateDoc(taskRef, {
-          ...updates,
-          updatedAt: serverTimestamp()
-        });
-      }
-    } catch (error) {
-      throw new Error('Failed to update task: ' + error.message);
-    }
+    await updateDoc(taskRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+      ...(changes.length > 0 && {
+        history: arrayUnion({
+          id: newId(),
+          type: 'UPDATED',
+          description: `Updated ${changes.join(', ')}`,
+          createdBy: userId,
+          createdAt: Timestamp.now(),
+        }),
+      }),
+    });
   },
 
   addComment: async (taskId, commentData, userId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      
-      // Create the comment with current timestamp
-      const comment = {
-        id: Date.now().toString(),
-        ...commentData,
+    const comment = {
+      id: newId(),
+      ...commentData,
+      createdBy: userId,
+      createdAt: Timestamp.now(),
+    };
+
+    await updateDoc(doc(db, 'tasks', taskId), {
+      comments: arrayUnion(comment),
+      updatedAt: serverTimestamp(),
+      history: arrayUnion({
+        id: newId(),
+        type: 'COMMENT_ADDED',
+        description: 'New comment added',
         createdBy: userId,
-        createdAt: Timestamp.now() // Use Timestamp.now() instead of serverTimestamp()
-      };
+        createdAt: Timestamp.now(),
+      }),
+    });
 
-      // Update the document with the new comment
-      await updateDoc(taskRef, {
-        comments: arrayUnion(comment),
-        updatedAt: serverTimestamp(),
-        history: arrayUnion({
-          id: Date.now().toString(),
-          type: 'COMMENT_ADDED',
-          description: 'New comment added',
-          createdBy: userId,
-          createdAt: Timestamp.now()
-        })
-      });
-
-      return comment;
-    } catch (error) {
-      throw new Error('Failed to add comment: ' + error.message);
-    }
+    return comment;
   },
 
-  deleteTask: async (taskId, userId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      
-      // Add deletion to history before deleting
-      await updateDoc(taskRef, {
-        history: arrayUnion({
-          id: Date.now().toString(),
-          type: 'DELETED',
-          description: 'Task deleted',
-          createdBy: userId,
-          createdAt: Timestamp.now()
-        })
-      });
-      
-      await deleteDoc(taskRef);
-    } catch (error) {
-      throw new Error('Failed to delete task: ' + error.message);
-    }
+  deleteTask: async (taskId) => {
+    // Read assignees before deleting so we can recalculate their metrics
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+    const assignees = taskSnap.data()?.assignees || [];
+
+    await deleteDoc(taskRef);
+
+    // Recalculate metrics for affected assignees
+    assignees.forEach((uid) => metricsService.calculateAndStoreMetrics(uid).catch(console.error));
   },
 
   updateAssignees: async (taskId, newAssignees, userId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const taskSnap = await getDoc(taskRef);
-      const oldAssignees = taskSnap.data()?.assignees || [];
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+    const oldAssignees = taskSnap.data()?.assignees || [];
 
-      const added = newAssignees.filter(a => !oldAssignees.includes(a));
-      const removed = oldAssignees.filter(a => !newAssignees.includes(a));
+    const added = newAssignees.filter((a) => !oldAssignees.includes(a));
+    const removed = oldAssignees.filter((a) => !newAssignees.includes(a));
+    const parts = [];
+    if (added.length) parts.push(`Added: ${added.length} assignee(s)`);
+    if (removed.length) parts.push(`Removed: ${removed.length} assignee(s)`);
 
-      let description = '';
-      if (added.length) description += `Added assignees: ${added.join(', ')} `;
-      if (removed.length) description += `Removed assignees: ${removed.join(', ')}`;
+    await updateDoc(taskRef, {
+      assignees: newAssignees,
+      updatedAt: serverTimestamp(),
+      history: arrayUnion({
+        id: newId(),
+        type: 'ASSIGNEES_UPDATED',
+        description: parts.join('; '),
+        createdBy: userId,
+        createdAt: Timestamp.now(),
+      }),
+    });
 
-      await updateDoc(taskRef, {
-        assignees: newAssignees,
-        updatedAt: serverTimestamp(),
-        history: arrayUnion({
-          id: Date.now().toString(),
-          type: 'ASSIGNEES_UPDATED',
-          description: description.trim(),
-          createdBy: userId,
-          createdAt: Timestamp.now()
-        })
-      });
-    } catch (error) {
-      throw new Error('Failed to update assignees: ' + error.message);
-    }
-  }
+    // Recalculate metrics for all affected users (old + new assignees)
+    const allAffected = [...new Set([...oldAssignees, ...newAssignees])];
+    allAffected.forEach((uid) => metricsService.calculateAndStoreMetrics(uid).catch(console.error));
+  },
 };

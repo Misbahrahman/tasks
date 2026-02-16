@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import { X, Calendar } from "lucide-react";
 import MoreButton from "./MoreButton";
 import { AvatarGroup } from "./Avatar";
-import { useUserDetails } from "../../hooks/useUserDetails";
+import { useAllUsers } from "../../context/UsersContext";
 
 const TaskCard = ({
   id,
@@ -22,7 +22,8 @@ const TaskCard = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isDraggingRef = useRef(false);
   const isClickingMenuRef = useRef(false);
-  const { users: assigneeUsers, loading: loadingUsers } = useUserDetails(assignees);
+  const { getUsersByIds } = useAllUsers();
+  const assigneeUsers = getUsersByIds(assignees);
   
   const priorityStyles = {
     high: "bg-rose-50 text-rose-700 ring-rose-600/20",
@@ -171,8 +172,8 @@ const TaskCard = ({
       </div>
 
       <div className="mt-5">
-        {!loadingUsers && assigneeUsers.length > 0 && (
-          <AvatarGroup 
+        {assigneeUsers.length > 0 && (
+          <AvatarGroup
             users={assigneeUsers}
             max={5}
           />

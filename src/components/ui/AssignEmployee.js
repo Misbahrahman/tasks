@@ -1,6 +1,6 @@
 import React from 'react';
 import { Avatar, AVATAR_COLOR_MAP } from './Avatar';
-import { useUsers } from '../../hooks/useUser';
+import { useAllUsers } from '../../context/UsersContext';
 
 // Helper function to generate consistent avatar colors
 const getAvatarColor = (name = '') => {
@@ -15,7 +15,7 @@ const AssigneeSelect = ({
   selectedAssignees = [],
   className = ''
 }) => {
-  const { users, loading, error } = useUsers();
+  const { users, loading, error } = useAllUsers();
 
   const handleAssigneeChange = (assigneeId) => {
     if (selectedAssignees.includes(assigneeId)) {
@@ -95,7 +95,7 @@ const AssigneeSelect = ({
 
 // Selected Assignees display component
 export const SelectedAssignees = ({ assignees = [] }) => {
-  const { users, loading } = useUsers();
+  const { users, loading } = useAllUsers();
 
   if (loading) {
     return (

@@ -16,11 +16,9 @@ export const useProjects = () => {
       return;
     }
 
-    // Remove the team filter to get all projects
-    const q = query(collection(db, 'projects'));
-
-    const unsubscribe = onSnapshot(
-      q,
+    // Listen to projects
+    const projectsUnsub = onSnapshot(
+      query(collection(db, 'projects')),
       (snapshot) => {
         const projectsData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -28,21 +26,62 @@ export const useProjects = () => {
           createdAt: doc.data().createdAt?.toDate(),
           updatedAt: doc.data().updatedAt?.toDate()
         }));
-
-        // Sort projects by creation date (newest first)
         projectsData.sort((a, b) => b.createdAt - a.createdAt);
-        
-        setProjects(projectsData);
+        setProjects(prev => {
+          // Merge with live task counts if we already have them
+          const taskCounts = {};
+          prev.forEach(p => {
+            if (p._liveCounts) taskCounts[p.id] = p._liveCounts;
+          });
+          return projectsData.map(p => ({
+            ...p,
+            ...(taskCounts[p.id] ? {
+              _liveCounts: taskCounts[p.id],
+              metrics: { ...p.metrics, ...taskCounts[p.id] },
+            } : {}),
+          }));
+        });
         setLoading(false);
       },
-      (error) => {
-        console.error('Error fetching projects:', error);
-        setError(error.message);
+      (err) => {
+        console.error('Error fetching projects:', err);
+        setError(err.message);
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    // Listen to ALL tasks to compute real completedTasks / totalTasks per project
+    const tasksUnsub = onSnapshot(
+      query(collection(db, 'tasks')),
+      (snapshot) => {
+        const counts = {}; // { projectId: { totalTasks, completedTasks } }
+        snapshot.docs.forEach(d => {
+          const data = d.data();
+          const pid = data.projectId;
+          if (!pid) return;
+          if (!counts[pid]) counts[pid] = { totalTasks: 0, completedTasks: 0 };
+          counts[pid].totalTasks += 1;
+          if (data.status === 'done') counts[pid].completedTasks += 1;
+        });
+
+        setProjects(prev =>
+          prev.map(p => {
+            const live = counts[p.id] || { totalTasks: 0, completedTasks: 0 };
+            return {
+              ...p,
+              _liveCounts: live,
+              metrics: { ...p.metrics, ...live },
+            };
+          })
+        );
+      },
+      (err) => console.error('Error fetching task counts:', err)
+    );
+
+    return () => {
+      projectsUnsub();
+      tasksUnsub();
+    };
   }, []);
 
   return { projects, loading, error };

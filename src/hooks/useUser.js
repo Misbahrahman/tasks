@@ -1,162 +1,139 @@
-// src/hooks/useUser.js
-import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, collection, query, getDocs, serverTimestamp } from 'firebase/firestore';
+import { useState, useEffect, useCallback } from 'react';
+import { doc, onSnapshot, updateDoc, collection, query, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { authService } from '../firebase/auth';
 
+// ─── Current user + Firestore profile ────────────────────────────────────────
 export const useUser = () => {
-    const [userData, setUserData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-  
-    useEffect(() => {
-      const currentUser = authService.getCurrentUser();
-      if (!currentUser) {
-        setLoading(false);
-        return;
-      }
-  
-      const userDoc = doc(db, 'users', currentUser.uid);
-      const unsubscribe = onSnapshot(userDoc, 
-        (doc) => {
-          if (doc.exists()) {
-            setUserData({ 
-              id: doc.id, 
-              ...doc.data(),
-              currentProject: doc.data().currentProject || null 
-            });
-          } else {
-            setError('User not found');
-          }
-          setLoading(false);
-        },
-        (error) => {
-          setError(error.message);
-          setLoading(false);
-        }
-      );
-  
-      return () => unsubscribe();
-    }, []);
-  
-    const updateUserProfile = async (updates) => {
-      try {
-        const currentUser = authService.getCurrentUser();
-        if (!currentUser) throw new Error('No authenticated user');
-  
-        const userDoc = doc(db, 'users', currentUser.uid);
-        await updateDoc(userDoc, {
-          ...updates,
-          updatedAt: serverTimestamp()
-        });
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    };
-  
-    const setCurrentProject = async (projectId) => {
-      try {
-        const currentUser = authService.getCurrentUser();
-        if (!currentUser) throw new Error('No authenticated user');
-  
-        const userDoc = doc(db, 'users', currentUser.uid);
-        await updateDoc(userDoc, {
-          currentProject: projectId,
-          updatedAt: serverTimestamp()
-        });
-      } catch (error) {
-        throw new Error('Failed to update current project: ' + error.message);
-      }
-    };
-  
-    const getCurrentProject = () => userData?.currentProject || null;
-  
-    return { 
-      userData, 
-      loading, 
-      error, 
-      updateUserProfile, 
-      setCurrentProject,
-      getCurrentProject 
-    };
-  };
-
-  
-// Hook for user metrics
-export const useUserMetrics = (userId) => {
-  const [metrics, setMetrics] = useState(null);
+  const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
+    let firestoreUnsub = null;
 
-    const userDoc = doc(db, 'users', userId);
-    const unsubscribe = onSnapshot(userDoc, 
-      (doc) => {
-        if (doc.exists() && doc.data().metrics) {
-          setMetrics(doc.data().metrics);
-        }
+    // Outer: listen to Firebase Auth state so the hook works across sign-out / sign-in
+    const authUnsub = authService.onAuthStateChange((authUser) => {
+      // Clean up previous Firestore listener on auth change
+      if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+
+      if (!authUser) {
+        setUserData(null);
         setLoading(false);
-      },
-      (error) => {
-        setError(error.message);
-        setLoading(false);
+        return;
       }
-    );
 
-    return () => unsubscribe();
-  }, [userId]);
+      const userDocRef = doc(db, 'users', authUser.uid);
+      firestoreUnsub = onSnapshot(
+        userDocRef,
+        (snap) => {
+          if (snap.exists()) {
+            setUserData({
+              id: snap.id,
+              ...snap.data(),
+              currentProject: snap.data().currentProject || null,
+            });
+          } else {
+            setError('User profile not found');
+          }
+          setLoading(false);
+        },
+        (err) => {
+          setError(err.message);
+          setLoading(false);
+        }
+      );
+    });
 
-  return { metrics, loading, error };
+    return () => {
+      authUnsub();
+      if (firestoreUnsub) firestoreUnsub();
+    };
+  }, []);
+
+  // FIXED: lowercase 'role' matches what auth.js stores at registration
+  const isAdmin = userData?.role === 'Admin';
+
+  const updateUserProfile = useCallback(async (updates) => {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) throw new Error('No authenticated user');
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  }, []);
+
+  const setCurrentProject = useCallback(async (projectId) => {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) throw new Error('No authenticated user');
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      currentProject: projectId,
+      updatedAt: serverTimestamp(),
+    });
+  }, []);
+
+  const getCurrentProject = useCallback(() => userData?.currentProject || null, [userData]);
+
+  return { userData, loading, error, isAdmin, updateUserProfile, setCurrentProject, getCurrentProject };
 };
 
-// New hook for fetching all users
+// ─── All users (single fetch, shared via UsersContext) ───────────────────────
 export const useUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef);
-        const querySnapshot = await getDocs(q);
-        
-        const usersData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          initials: doc.data().name
-            .split(' ')
-            .map(n => n[0])
-            .join('')
-            .toUpperCase()
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) { setLoading(false); return; }
+
+    const unsub = onSnapshot(
+      query(collection(db, 'users')),
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          initials:
+            d.data().initials ||
+            d.data().name?.split(' ').map((n) => n[0]).join('').toUpperCase() ||
+            '?',
         }));
-        
-        setUsers(usersData);
+        setUsers(data);
         setLoading(false);
-      } catch (err) {
+      },
+      (err) => {
         setError(err.message);
         setLoading(false);
       }
-    };
+    );
 
-    fetchUsers();
+    return () => unsub();
   }, []);
 
-  // Function to get user details by ID
-  const getUserById = (userId) => {
-    return users.find(user => user.id === userId);
-  };
-
-  // Function to get multiple users by IDs
-  const getUsersByIds = (userIds) => {
-    return users.filter(user => userIds.includes(user.id));
-  };
+  const getUserById = useCallback((id) => users.find((u) => u.id === id) || null, [users]);
+  const getUsersByIds = useCallback(
+    (ids) => (ids?.length ? users.filter((u) => ids.includes(u.id)) : []),
+    [users]
+  );
 
   return { users, loading, error, getUserById, getUsersByIds };
+};
+
+// ─── User metrics (reads from userData directly — no extra listener needed) ──
+export const useUserMetrics = (userId) => {
+  // Kept for backward compatibility; Profile now uses userData.metrics directly.
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) { setLoading(false); return; }
+    const userDocRef = doc(db, 'users', userId);
+    const unsub = onSnapshot(userDocRef, (snap) => {
+      setMetrics(snap.exists() ? snap.data().metrics || null : null);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [userId]);
+
+  return { metrics, loading };
 };

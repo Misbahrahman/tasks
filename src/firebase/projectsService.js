@@ -1,142 +1,95 @@
-// src/firebase/projectsService.js
-import { collection, addDoc, doc, deleteDoc, updateDoc, serverTimestamp, getDoc, increment, query, where, getDocs } from 'firebase/firestore';
+import {
+  collection, addDoc, doc, deleteDoc, updateDoc,
+  serverTimestamp, increment, query, where, getDocs
+} from 'firebase/firestore';
 import { db } from './config';
+import { metricsService } from './metricsService';
 
 export const projectsService = {
   createProject: async (projectData, userId) => {
-    try {
-      // Generate a numeric ID using timestamp
-      const numericId = Date.now().toString();
-
-      const projectsRef = collection(db, 'projects');
-      const docRef = await addDoc(projectsRef, {
-        ...projectData,
-        id: numericId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: userId,
-        metrics: {
-          totalTasks: 0,
-          completedTasks: 0,
-        },
-        metricsDescription: "0/0 tasks",
-        progress: 0
-      });
-
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating project:', error);
-      throw error;
-    }
+    const docRef = await addDoc(collection(db, 'projects'), {
+      ...projectData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      createdBy: userId,
+      metrics: { totalTasks: 0, completedTasks: 0 },
+      progress: 0,
+    });
+    return docRef.id;
   },
 
-  updateProjectMetrics : async (projectId, actionType, currentStatus = null) => {
-    try {
-      // Get current project metrics
-      const projectsRef = collection(db, "projects");
-      const projectQuery = query(projectsRef, where("id", "==", projectId));
-      const querySnapshot = await getDocs(projectQuery);
-  
-      if (querySnapshot.empty) {
-        console.error("No project found with the provided ID.");
-        return;
-      }
-  
-      const docRef = querySnapshot.docs[0].ref;
-      const projectData = querySnapshot.docs[0].data();
-      
-      let { totalTasks = 0, completedTasks = 0 } = projectData.metrics || {};
-  
-      // Update metrics based on action type
-      switch (actionType) {
-        case 'CREATE_TASK':
-          totalTasks += 1;
-          break;
-          
-        case 'DELETE_TASK':
-          totalTasks -= 1;
-          // If deleting a completed task, decrease completedTasks
-          if (currentStatus === 'done') {
-            completedTasks = Math.max(0, completedTasks - 1);
-          }
-          break;
-          
-        case 'STATUS_CHANGE':
-          if (currentStatus === 'done') {
-            completedTasks += 1;
-          } else if (currentStatus === 'from_done') {
-            completedTasks = Math.max(0, completedTasks - 1);
-          }
-          break;
-          
-        default:
-          console.warn('Unknown action type:', actionType);
-          return;
-      }
-  
-      // Calculate progress percentage
-      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  
-      // Update project document
-      await updateDoc(docRef, {
-        'metrics.totalTasks': totalTasks,
-        'metrics.completedTasks': completedTasks,
-        progress,
-        metricsDescription: `${completedTasks}/${totalTasks} tasks`,
-        updatedAt: serverTimestamp()
-      });
-  
-      return { totalTasks, completedTasks, progress };
-    } catch (error) {
-      console.error('Error updating project metrics:', error);
-      throw error;
+  // All metric operations now use atomic increment() — no race conditions,
+  // no extra reads, and directly address the project by its Firestore doc ID.
+  updateProjectMetrics: async (projectId, actionType, currentStatus = null) => {
+    if (!projectId || projectId === 0 || projectId === '0') return;
+    const docRef = doc(db, 'projects', projectId);
+
+    switch (actionType) {
+      case 'CREATE_TASK':
+        await updateDoc(docRef, {
+          'metrics.totalTasks': increment(1),
+          updatedAt: serverTimestamp(),
+        });
+        break;
+
+      case 'DELETE_TASK':
+        await updateDoc(docRef, {
+          'metrics.totalTasks': increment(-1),
+          ...(currentStatus === 'done' && { 'metrics.completedTasks': increment(-1) }),
+          updatedAt: serverTimestamp(),
+        });
+        break;
+
+      case 'STATUS_CHANGE':
+        if (currentStatus === 'done') {
+          await updateDoc(docRef, {
+            'metrics.completedTasks': increment(1),
+            updatedAt: serverTimestamp(),
+          });
+        } else if (currentStatus === 'from_done') {
+          await updateDoc(docRef, {
+            'metrics.completedTasks': increment(-1),
+            updatedAt: serverTimestamp(),
+          });
+        }
+        break;
+
+      default:
+        console.warn('Unknown action type:', actionType);
     }
   },
 
   closeProject: async (projectId) => {
-    try {
-      const projectsRef = collection(db, "projects");
-      const q = query(projectsRef, where("id", "==", projectId)); 
-      const querySnapshot = await getDocs(q);
+    const docRef = doc(db, 'projects', projectId);
+    await updateDoc(docRef, { status: 'completed', updatedAt: serverTimestamp() });
+  },
 
-      if (querySnapshot.empty) {
-          alert("No project found with the provided ID.");
-          return;
-      }
-
-      const projectRef = querySnapshot.docs[0].ref;
-
-      await updateDoc(projectRef, {
-        status: 'completed',
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error closing project:', error);
-      throw error;
-    }
+  reopenProject: async (projectId) => {
+    const docRef = doc(db, 'projects', projectId);
+    await updateDoc(docRef, { status: 'active', updatedAt: serverTimestamp() });
   },
 
   deleteProject: async (projectId) => {
-    try {
+    // Cascade-delete all tasks belonging to this project first
+    const tasksSnap = await getDocs(
+      query(collection(db, 'tasks'), where('projectId', '==', projectId))
+    );
 
-      const projectsRef = collection(db, "projects");
-      const q = query(projectsRef, where("id", "==", projectId)); 
-      const querySnapshot = await getDocs(q);
+    // Collect all affected assignees before deleting tasks
+    const affectedUserIds = new Set();
+    tasksSnap.docs.forEach((d) => {
+      const assignees = d.data().assignees || [];
+      assignees.forEach((uid) => affectedUserIds.add(uid));
+    });
 
-      if (querySnapshot.empty) {
-          alert("No project found with the provided ID.");
-          return;
-      }
+    await Promise.all(tasksSnap.docs.map((d) => deleteDoc(d.ref)));
 
-      const docRef = querySnapshot.docs[0].ref;
+    // Then delete the project document
+    await deleteDoc(doc(db, 'projects', projectId));
 
-      await deleteDoc(docRef);
-
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      throw error;
-    }
-  }
+    // Recalculate metrics for all affected users
+    affectedUserIds.forEach((uid) => metricsService.calculateAndStoreMetrics(uid).catch(console.error));
+  },
 };
 
 export default projectsService;

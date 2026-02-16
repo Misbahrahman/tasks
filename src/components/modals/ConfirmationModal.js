@@ -1,8 +1,8 @@
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
 
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, type }) => {
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, type, isProcessing = false }) => {
     if (!isOpen) return null;
-  
+
     const modalContent = {
       delete: {
         title: "Delete Project",
@@ -17,6 +17,13 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, type }) => {
         confirmText: "Close Project",
         icon: <CheckCircle className="w-6 h-6 text-green-500 mb-2" />,
         confirmButtonClass: "bg-green-500 hover:bg-green-600",
+      },
+      reopen: {
+        title: "Reopen Project",
+        message: "Are you sure you want to reopen this project? It will be set back to active.",
+        confirmText: "Reopen Project",
+        icon: <RefreshCw className="w-6 h-6 text-blue-500 mb-2" />,
+        confirmButtonClass: "bg-blue-500 hover:bg-blue-600",
       }
     };
   
@@ -37,18 +44,17 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, type }) => {
           <div className="flex justify-end space-x-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+              disabled={isProcessing}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
-              onClick={() => {
-                onConfirm();
-                onClose();
-              }}
-              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${content.confirmButtonClass}`}
+              onClick={onConfirm}
+              disabled={isProcessing}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${content.confirmButtonClass}`}
             >
-              {content.confirmText}
+              {isProcessing ? 'Processing…' : content.confirmText}
             </button>
           </div>
         </div>

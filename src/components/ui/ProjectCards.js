@@ -1,15 +1,29 @@
 // src/components/ProjectCard.jsx
 import React, { useState } from "react";
-import { Calendar, CheckCircle, Trash2 } from "lucide-react";
+import { Calendar, CheckCircle, Trash2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../../hooks/useUser";
-import { useUserDetails } from "../../hooks/useUserDetails";
+import { useAuth } from "../../context/AuthContext";
+import { useAllUsers } from "../../context/UsersContext";
 import MoreButton from "./MoreButton";
 import { AvatarGroup } from "./Avatar";
 
-const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
+const ProjectCard = ({
+  project,
+  onDelete,
+  onClose,
+  onReopen,
+  isProcessing,
+  isDragging = false,
+  isDragOver = false,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+}) => {
   const navigate = useNavigate();
-  const { setCurrentProject } = useUser();
+  const { setCurrentProject } = useAuth();
+  const { getUsersByIds } = useAllUsers();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
 
@@ -24,7 +38,7 @@ const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
     status,
   } = project;
 
-  const { users: teamMembers, loading: loadingTeam } = useUserDetails(team);
+  const teamMembers = getUsersByIds(team);
 
   // Calculate real progress based on tasks
   const calculateProgress = () => {
@@ -35,6 +49,9 @@ const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
   const handleProjectSelect = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Don't navigate into completed projects — use the menu to reopen first
+    if (status === "completed") return;
 
     try {
       if (isSelecting) return;
@@ -103,11 +120,28 @@ const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
 
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.();
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver?.(e);
+      }}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop?.();
+      }}
+      onDragEnd={onDragEnd}
       onClick={handleProjectSelect}
-      className={`w-[380px] bg-white rounded-[32px] p-6 
+      className={`w-full bg-white rounded-[32px] p-6
     ${status !== "completed" ? "hover:shadow-lg hover:translate-y-[-2px]" : ""}
-    transition-all duration-300 ease-in-out 
-    cursor-pointer group relative
+    transition-all duration-300 ease-in-out
+    ${status === "completed" ? "cursor-default" : "cursor-grab active:cursor-grabbing"} group relative
+    ${isDragging ? "opacity-40 scale-95" : ""}
+    ${isDragOver ? "ring-2 ring-blue-400 ring-offset-2 scale-[1.02] shadow-lg" : ""}
     ${isSelecting || isProcessing ? "opacity-75 pointer-events-none" : ""}
     ${status === "completed" ? "bg-slate-50 opacity-75" : ""}`}
     >
@@ -159,6 +193,16 @@ const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
                       Complete Project
                     </button>
                   )}
+                  {status === "completed" && (
+                    <button
+                      onClick={handleMenuAction(onReopen, id)}
+                      className="flex w-full items-center px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+                      disabled={isProcessing}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Reopen Project
+                    </button>
+                  )}
                   <button
                     onClick={handleMenuAction(onDelete, id)}
                     className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -202,7 +246,7 @@ const ProjectCard = ({ project, onDelete, onClose, isProcessing }) => {
 
       {/* Footer */}
       <div className="mt-6 flex items-center justify-between">
-        {!loadingTeam && teamMembers.length > 0 && (
+        {teamMembers.length > 0 && (
           <AvatarGroup users={teamMembers} max={5} />
         )}
         <div className="flex items-center">
