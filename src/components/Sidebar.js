@@ -5,16 +5,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../firebase/auth';
 import { useAuth } from '../context/AuthContext';
 
-const Sidebar = () => {
+const Sidebar = ({ onNavigate }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { userData, isAdmin } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleNavClick = (navId) => {
-    if (navId === 'projects') { navigate('/'); return; }
-    if (navId === 'profile')  { navigate('/profile'); return; }
-    if (navId === 'admin')    { navigate('/admin'); return; }
+    if (navId === 'projects') { navigate('/'); onNavigate?.(); return; }
+    if (navId === 'profile')  { navigate('/profile'); onNavigate?.(); return; }
+    if (navId === 'admin')    { navigate('/admin'); onNavigate?.(); return; }
     if (navId === 'tasks' || navId === 'all-tasks') {
       if (userData?.currentProject) {
         navigate(navId === 'tasks'
@@ -24,6 +24,7 @@ const Sidebar = () => {
       } else {
         navigate('/');
       }
+      onNavigate?.();
     }
   };
 
@@ -64,7 +65,7 @@ const Sidebar = () => {
   );
 
   return (
-    <div className="w-72 bg-white shadow-lg">
+    <div className="w-72 h-full overflow-y-auto bg-white shadow-lg">
       <div className="px-5 pt-6 pb-2">
         <div className="flex items-center space-x-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50
           border border-blue-100/60 rounded-2xl px-4 py-3

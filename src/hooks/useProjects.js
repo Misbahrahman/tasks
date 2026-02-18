@@ -21,8 +21,11 @@ export const useProjects = () => {
       query(collection(db, 'projects')),
       (snapshot) => {
         const projectsData = snapshot.docs.map(doc => ({
-          id: doc.id,
           ...doc.data(),
+          id: doc.id,
+          // Preserve the stored legacy id so task count lookups can match tasks
+          // that were created before the Firestore doc ID migration
+          _dataId: doc.data().id != null ? String(doc.data().id) : null,
           createdAt: doc.data().createdAt?.toDate(),
           updatedAt: doc.data().updatedAt?.toDate()
         }));
@@ -66,7 +69,8 @@ export const useProjects = () => {
 
         setProjects(prev =>
           prev.map(p => {
-            const live = counts[p.id] || { totalTasks: 0, completedTasks: 0 };
+            // Check by Firestore doc ID first, then by legacy stored data.id
+            const live = counts[p.id] || (p._dataId ? counts[p._dataId] : null) || { totalTasks: 0, completedTasks: 0 };
             return {
               ...p,
               _liveCounts: live,

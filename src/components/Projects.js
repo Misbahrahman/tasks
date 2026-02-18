@@ -1,7 +1,7 @@
 // src/pages/ProjectsPage.jsx
 import React, { useState, useEffect } from "react";
 import { Plus, Search, Loader } from "lucide-react";
-import Sidebar from "../components/Sidebar";
+import Layout from "./ui/Layout";
 import Header from "./ui/Header";
 import ProjectModal from "./modals/ProjectModal";
 import ProjectCard from "./ui/ProjectCards";
@@ -185,102 +185,103 @@ const ProjectsPage = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-h-0">
-        <Header>
-          <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64 pl-10 pr-4 py-2 bg-gradient-to-r from-blue-50 to-blue-100 
-                  border border-blue-200 rounded-lg text-slate-600 placeholder-slate-400
-                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <Search className="w-5 h-5 text-blue-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            </div>
-            <button
-              onClick={() => {
-                if (!isAdmin) {
-                  showModal({
-                    type: 'error',
-                    title: 'Access Denied',
-                    message: 'Only admins can create projects. Contact your administrator to have a project created.',
-                  });
-                  return;
-                }
-                setIsModalOpen(true);
-              }}
-              disabled={isProcessing}
-              className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600
-                text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200
-                disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Project
-            </button>
-          </div>
-        </Header>
-
-        <main className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onDelete={(id) => handleProjectAction(id, 'delete')}
-                onClose={(id) => handleProjectAction(id, 'close')}
-                onReopen={(id) => handleProjectAction(id, 'reopen')}
-                isDragging={draggedId === project.id}
-                isDragOver={dragOverId === project.id}
-                onDragStart={() => handleDragStart(project.id)}
-                onDragOver={(e) => handleDragOver(e, project.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={() => handleDrop(project.id)}
-                onDragEnd={handleDragEnd}
-              />
-            ))}
-            {filteredProjects.length === 0 && (
-              <div className="w-full text-center py-8">
-                <p className="text-slate-500">
-                  {searchTerm 
-                    ? `No projects found matching "${searchTerm}"`
-                    : "No projects yet. Click 'Add Project' to create your first project."
-                  }
-                </p>
+    <Layout>
+      {({ toggleSidebar }) => (
+        <>
+          <Header onToggleSidebar={toggleSidebar}>
+            <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gradient-to-r from-blue-50 to-blue-100
+                    border border-blue-200 rounded-lg text-slate-600 placeholder-slate-400
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <Search className="w-5 h-5 text-blue-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
               </div>
-            )}
-          </div>
-        </main>
+              <button
+                onClick={() => {
+                  if (!isAdmin) {
+                    showModal({
+                      type: 'error',
+                      title: 'Access Denied',
+                      message: 'Only admins can create projects. Contact your administrator to have a project created.',
+                    });
+                    return;
+                  }
+                  setIsModalOpen(true);
+                }}
+                disabled={isProcessing}
+                className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600
+                  text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Project
+              </button>
+            </div>
+          </Header>
 
-        <ProjectModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSubmit={handleAddProject}
-          isProcessing={isProcessing}
-        />
+          <main className="p-4 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {filteredProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onDelete={(id) => handleProjectAction(id, 'delete')}
+                  onClose={(id) => handleProjectAction(id, 'close')}
+                  onReopen={(id) => handleProjectAction(id, 'reopen')}
+                  isDragging={draggedId === project.id}
+                  isDragOver={dragOverId === project.id}
+                  onDragStart={() => handleDragStart(project.id)}
+                  onDragOver={(e) => handleDragOver(e, project.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={() => handleDrop(project.id)}
+                  onDragEnd={handleDragEnd}
+                />
+              ))}
+              {filteredProjects.length === 0 && (
+                <div className="w-full text-center py-8">
+                  <p className="text-slate-500">
+                    {searchTerm
+                      ? `No projects found matching "${searchTerm}"`
+                      : "No projects yet. Click 'Add Project' to create your first project."
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+          </main>
 
-        <ConfirmationModal
-          isOpen={confirmModal.open}
-          onClose={() => setConfirmModal({ open: false, type: null, projectId: null })}
-          onConfirm={handleConfirmAction}
-          type={confirmModal.type}
-          isProcessing={isProcessing}
-        />
+          <ProjectModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSubmit={handleAddProject}
+            isProcessing={isProcessing}
+          />
 
-        <AppModal
-          isOpen={modalState.isOpen}
-          onClose={hideModal}
-          type={modalState.type}
-          title={modalState.title}
-          message={modalState.message}
-        />
-      </div>
-    </div>
+          <ConfirmationModal
+            isOpen={confirmModal.open}
+            onClose={() => setConfirmModal({ open: false, type: null, projectId: null })}
+            onConfirm={handleConfirmAction}
+            type={confirmModal.type}
+            isProcessing={isProcessing}
+          />
+
+          <AppModal
+            isOpen={modalState.isOpen}
+            onClose={hideModal}
+            type={modalState.type}
+            title={modalState.title}
+            message={modalState.message}
+          />
+        </>
+      )}
+    </Layout>
   );
 };
 

@@ -4,7 +4,7 @@ import {
   TrendingUp, AlertTriangle, CalendarClock, BarChart3, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from './Sidebar';
+import Layout from './ui/Layout';
 import Header from './ui/Header';
 import { AVATAR_COLOR_MAP, getInitials } from '../utils';
 import { useAuth } from '../context/AuthContext';
@@ -108,13 +108,13 @@ const ProfilePage = () => {
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-h-0">
-        <Header>
+    <Layout>
+      {({ toggleSidebar }) => (
+        <>
+        <Header onToggleSidebar={toggleSidebar}>
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 rounded-full ${selectedColor?.bgClass}
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full ${selectedColor?.bgClass}
                 flex items-center justify-center text-xl font-medium text-white`}>
                 {getInitials(userData?.name || '')}
               </div>
@@ -129,7 +129,7 @@ const ProfilePage = () => {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-4 mt-1">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1">
                   <div className="flex items-center text-slate-500">
                     <Mail className="w-4 h-4 mr-1.5" />
                     <span className="text-sm">{userData?.email}</span>
@@ -152,7 +152,7 @@ const ProfilePage = () => {
           </div>
         </Header>
 
-        <main className="flex-1 p-8 space-y-8">
+        <main className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8">
           {/* Avatar Color Picker */}
           <div className="bg-white rounded-[32px] p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -226,8 +226,9 @@ const ProfilePage = () => {
             )}
           </div>
         </main>
-      </div>
-    </div>
+        </>
+      )}
+    </Layout>
   );
 };
 

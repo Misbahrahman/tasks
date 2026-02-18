@@ -15,8 +15,7 @@ const FilterDropdown = ({ elements = [], onChange, selectedValue }) => {
   };
 
   return (
-    <div className="flex space-x-4 items-center">
-      <div className="relative w-64">
+      <div className="relative w-full sm:w-64">
         <select
           value={selectedElement}
           onChange={handleChange}
@@ -33,7 +32,6 @@ const FilterDropdown = ({ elements = [], onChange, selectedValue }) => {
         </select>
         <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 pointer-events-none" />
       </div>
-    </div>
   );
 };
 

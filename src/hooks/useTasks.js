@@ -39,12 +39,17 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
           const querySnapshot = await getDocs(q);
 
           let foundProject = null;
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.id && data.id.toString() === projectId.toString()) {
+          querySnapshot.forEach((d) => {
+            const data = d.data();
+            // Match by Firestore doc ID or by legacy stored id field
+            const pid = projectId.toString();
+            if (d.id === pid || (data.id && data.id.toString() === pid)) {
               foundProject = {
-                id: doc.id,
                 ...data,
+                id: d.id,
+                // Preserve stored data.id for task queries (backward compat):
+                // old tasks were stored with projectId = data.id, not the Firestore doc ID
+                _dataId: data.id != null ? String(data.id) : null,
                 createdAt: data.createdAt?.toDate(),
                 updatedAt: data.updatedAt?.toDate(),
               };
@@ -114,6 +119,13 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
     const isAllProjects = projectId === 0 || projectId === "0";
     const isAllUsers = !selectedUserId || selectedUserId === 0 || selectedUserId === "0";
 
+    // Use the stored data.id for task queries when available (backward compat).
+    // Old tasks stored projectId as the project's stored data.id field (not the Firestore doc ID).
+    // New projects without a stored data.id fall back to the Firestore doc ID.
+    const effectiveProjectId = (!isAllProjects && project?._dataId != null)
+      ? project._dataId
+      : projectId;
+
     if (viewType === "my-tasks") {
       if (isAllProjects) {
         q = query(
@@ -123,7 +135,7 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
       } else {
         q = query(
           tasksRef,
-          where("projectId", "==", projectId),
+          where("projectId", "==", effectiveProjectId),
           where("assignees", "array-contains", currentUser?.uid)
         );
       }
@@ -131,7 +143,7 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
       if (!isAllProjects && !isAllUsers) {
         q = query(
           tasksRef,
-          where("projectId", "==", projectId),
+          where("projectId", "==", effectiveProjectId),
           where("assignees", "array-contains", selectedUserId)
         );
       } else if (isAllProjects && !isAllUsers) {
@@ -140,7 +152,7 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
           where("assignees", "array-contains", selectedUserId)
         );
       } else if (!isAllProjects && isAllUsers) {
-        q = query(tasksRef, where("projectId", "==", projectId));
+        q = query(tasksRef, where("projectId", "==", effectiveProjectId));
       } else {
         q = query(tasksRef);
       }
@@ -158,8 +170,8 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
 
         snapshot.docs.forEach((doc) => {
           const task = {
-            id: doc.id,
             ...doc.data(),
+            id: doc.id,
             createdAt: doc.data().createdAt?.toDate(),
             updatedAt: doc.data().updatedAt?.toDate(),
           };
@@ -199,11 +211,19 @@ export const useTasks = (projectId, viewType = null, selectedUserId) => {
     return () => unsubscribe();
   }, [projectId, project, viewType, userDetails, selectedUserId, currentUser?.uid]);
 
+  // The id to use when creating/querying tasks for this project.
+  // Old tasks stored projectId as the project's stored data.id (legacy),
+  // so we use that when available to keep everything consistent.
+  const effectiveProjectId = (projectId !== 0 && projectId !== "0" && project?._dataId != null)
+    ? project._dataId
+    : projectId;
+
   return {
     tasks,
     loading,
     error,
     currentProjectId: projectId,
+    effectiveProjectId,
     project,
     userDetails,
   };

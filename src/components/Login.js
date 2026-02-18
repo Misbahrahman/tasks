@@ -82,7 +82,7 @@ const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'pa
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white px-8 py-10 rounded-2xl shadow-sm">
+        <div className="bg-white px-5 py-8 sm:px-8 sm:py-10 rounded-2xl shadow-sm">
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-semibold text-slate-800 mb-2">Welcome back</h1>
             <p className="text-slate-500">Sign in to your account to continue</p>

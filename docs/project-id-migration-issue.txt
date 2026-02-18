@@ -1,0 +1,187 @@
+================================================================================
+ISSUE: PROJECT ID MIGRATION — FIRESTORE DOC ID vs. STORED LEGACY ID
+================================================================================
+
+PROJECT: IRPC TaskApp (React + Firebase/Firestore)
+DATE: 2026-02-18
+FILES AFFECTED:
+  - src/hooks/useProjects.js
+  - src/hooks/useTasks.js
+  - src/components/Kanban.js
+  - src/components/modals/TaskModal.js
+
+--------------------------------------------------------------------------------
+BACKGROUND
+--------------------------------------------------------------------------------
+
+Firestore project documents were created using addDoc(), which auto-generates
+a document ID (e.g. "XYZ123abc"). However, the project documents also contain
+a stored "id" field in their data (doc.data().id) — a legacy field that was
+set by an older version of the app (e.g. a numeric or short string value like
+"1", "2", "abc").
+
+Tasks were originally created with:
+  taskService.createTask(projectId, ...)
+  → stored as: { projectId: "<legacy stored id>", ... }
+
+So tasks in Firestore reference the STORED data.id field, NOT the Firestore
+auto-generated document ID.
+
+--------------------------------------------------------------------------------
+THE CHANGE THAT TRIGGERED THE BUGS
+--------------------------------------------------------------------------------
+
+In useProjects.js, the project mapping object was:
+
+  BEFORE (old):
+    { id: doc.id, ...doc.data(), createdAt: ..., updatedAt: ... }
+    → doc.data() spreads AFTER id: doc.id, so if doc.data() has an "id" field,
+      it OVERRIDES the Firestore doc ID.
+    → Result: project.id = doc.data().id  (the legacy stored id)
+
+  AFTER (user's fix):
+    { ...doc.data(), id: doc.id, createdAt: ..., updatedAt: ... }
+    → id: doc.id comes LAST, so it always OVERRIDES the stored data.id.
+    → Result: project.id = doc.id  (the Firestore document ID)
+
+WHY THE FIX WAS MADE:
+  Project operations (delete, reopen, complete project) use:
+    doc(db, 'projects', projectId)
+  This requires the Firestore document ID. With the old order, project.id was
+  the legacy stored id, so these operations were broken (they were trying to
+  reference a document by the wrong ID). Putting id: doc.id last fixed them.
+
+--------------------------------------------------------------------------------
+BUGS INTRODUCED BY THE CHANGE
+--------------------------------------------------------------------------------
+
+BUG 1: Tasks not showing in project-specific Kanban board
+  - URL now contains the Firestore doc ID (e.g. /tasks/XYZ123abc/all)
+  - useTasks.js queried: where("projectId", "==", "XYZ123abc")
+  - But existing tasks have: projectId = "<legacy stored id>" (e.g. "1")
+  - Result: query returns 0 tasks → empty board
+
+BUG 2: Progress bar always showing 0% on the Projects page
+  - useProjects.js task count listener grouped tasks by data.projectId
+  - Then looked up: counts[p.id] where p.id = Firestore doc ID
+  - But counts was keyed by the legacy stored id (e.g. counts["1"])
+  - counts["XYZ123abc"] = undefined → fell back to { totalTasks: 0 }
+  - Result: progress bar always empty, "No tasks yet" shown for all projects
+
+--------------------------------------------------------------------------------
+THE FIX
+--------------------------------------------------------------------------------
+
+CORE PRINCIPLE:
+  Keep id = Firestore doc ID (needed for CRUD operations).
+  Separately preserve the legacy stored data.id as _dataId for backward
+  compatibility with existing task data.
+
+--- useProjects.js ---
+
+  1. In project mapping, add _dataId field:
+       _dataId: doc.data().id != null ? String(doc.data().id) : null
+
+  2. In task count lookup, check both ids:
+       const live =
+         counts[p.id] ||
+         (p._dataId ? counts[p._dataId] : null) ||
+         { totalTasks: 0, completedTasks: 0 };
+
+--- useTasks.js ---
+
+  1. In foundProject (fetchData effect), add _dataId:
+       _dataId: data.id != null ? String(data.id) : null
+
+  2. In the task query effect, compute effectiveProjectId:
+       const effectiveProjectId =
+         (!isAllProjects && project?._dataId != null)
+           ? project._dataId
+           : projectId;
+
+     Use effectiveProjectId in ALL where("projectId", "==", ...) clauses.
+
+  3. Expose from hook return:
+       const effectiveProjectId =
+         (projectId !== 0 && projectId !== "0" && project?._dataId != null)
+           ? project._dataId
+           : projectId;
+       return { ..., effectiveProjectId, ... };
+
+--- Kanban.js ---
+
+  1. Destructure effectiveProjectId from useTasks.
+  2. Pass to TaskModal:
+       projectId={effectiveProjectId}          ← for task creation (legacy id)
+       firestoreProjectId={project?.id || selectedProjectId}  ← for metrics
+
+--- TaskModal.js ---
+
+  1. Accept firestoreProjectId prop.
+  2. Use it for metrics update (needs real Firestore doc ID):
+       await projectsService.updateProjectMetrics(
+         firestoreProjectId || projectId,
+         'CREATE_TASK'
+       );
+
+--------------------------------------------------------------------------------
+HOW _dataId FLOWS THROUGH THE APP
+--------------------------------------------------------------------------------
+
+  Firestore project doc
+    ├── doc.id          → project.id       (used for: delete, reopen, complete,
+    │                                        navigate URL, setCurrentProject)
+    └── doc.data().id   → project._dataId  (used for: task queries, task creation
+                                             to stay consistent with existing data)
+
+  Task documents in Firestore
+    └── projectId field = the _dataId value at creation time
+        (for old tasks) OR the Firestore doc ID (for tasks created after the
+        migration is complete and _dataId is null)
+
+--------------------------------------------------------------------------------
+LONG-TERM RECOMMENDATION
+--------------------------------------------------------------------------------
+
+Run a one-time Firestore migration to update all task documents:
+  - For each project, find all tasks where projectId == project._dataId
+  - Update them to: projectId = project.id (Firestore doc ID)
+  - Remove the stored "id" field from all project documents
+
+After migration:
+  - _dataId will be null for all projects (no legacy id stored)
+  - effectiveProjectId will always equal the Firestore doc ID
+  - The backward-compat fallback code can be removed
+
+Until migration is done, the _dataId fallback logic MUST remain in place.
+
+--------------------------------------------------------------------------------
+KEY FILES REFERENCE
+--------------------------------------------------------------------------------
+
+src/hooks/useProjects.js
+  - Maps all projects from Firestore
+  - Computes live task counts (totalTasks, completedTasks) per project
+  - Powers the progress bar on the Projects page
+
+src/hooks/useTasks.js
+  - Fetches tasks for a given projectId (from URL param)
+  - Finds the matching project document
+  - Subscribes to filtered task list for the Kanban board
+
+src/firebase/projectsService.js
+  - createProject: uses addDoc (NO stored id field — new projects have no _dataId)
+  - deleteProject, closeProject, reopenProject: use doc(db, 'projects', projectId)
+    → requires Firestore doc ID (project.id, NOT project._dataId)
+
+src/firebase/taskService.js
+  - createTask(projectId, ...): stores projectId directly as given
+    → must receive effectiveProjectId (legacy id) for backward compat
+
+src/components/Kanban.js
+  - selectedProjectId: Firestore doc ID from URL params (for project operations)
+  - effectiveProjectId: legacy id from useTasks hook (for task creation/query)
+
+================================================================================
+END OF DOCUMENT
+================================================================================

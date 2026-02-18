@@ -263,9 +263,9 @@ const TaskDetailModal = ({
         onClick={onClose}
       />
 
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-end sm:items-center sm:justify-center sm:p-4">
         <div
-          className="relative w-full max-w-4xl max-h-[90vh] rounded-xl bg-white shadow-xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-t-xl sm:rounded-xl bg-white shadow-xl overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

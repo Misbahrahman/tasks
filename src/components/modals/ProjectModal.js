@@ -54,9 +54,9 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, isProcessing }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center sm:justify-center z-50">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] overflow-hidden">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100">
           <h2 className="text-xl font-semibold text-slate-800">
             Create New Project
           </h2>
@@ -68,7 +68,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, isProcessing }) => {
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
-        <div className="overflow-y-auto p-6 max-h-[calc(90vh-120px)]">
+        <div className="overflow-y-auto p-4 sm:p-6 sm:max-h-[calc(90vh-120px)]">
           <form onSubmit={handleSubmit} className="space-y-6">
             <TextInput
               id="project-title"
@@ -96,7 +96,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, isProcessing }) => {
               disabled={isProcessing}
             />
 
-            <div className="flex gap-6">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Category

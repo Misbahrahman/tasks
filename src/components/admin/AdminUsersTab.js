@@ -65,7 +65,7 @@ const UserMetricsPanel = ({ userId }) => {
       {/* Workload */}
       <div>
         <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Current Workload</h4>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {workloadMetrics.map(m => {
             const Icon = m.icon;
             return (
@@ -156,7 +156,7 @@ const AdminUsersTab = () => {
   return (
     <div className="space-y-6">
       {/* Search */}
-      <div className="relative w-80">
+      <div className="relative w-full sm:w-80">
         <Search className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
