@@ -64,8 +64,8 @@ const TaskModal = ({ isOpen, onClose, projectId, firestoreProjectId }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center sm:justify-center z-50">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-2xl flex flex-col h-full sm:h-auto sm:max-h-[90vh]">
+        <div className="flex-shrink-0 flex items-center justify-between p-4 sm:p-6 border-b border-slate-100">
           <h2 className="text-xl font-semibold text-slate-800">
             Create New Task
           </h2>
@@ -77,7 +77,7 @@ const TaskModal = ({ isOpen, onClose, projectId, firestoreProjectId }) => {
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
-        <div className="overflow-y-auto p-4 sm:p-6 sm:max-h-[calc(90vh-120px)]">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <TextInput
               id="task-title"
